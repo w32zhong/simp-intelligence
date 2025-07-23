@@ -9,3 +9,4 @@ version = "0.1.0"
 
 [dependencies]
 modular = ">=25.5.0.dev2025072205,<26"
+notebook = ">=7.4.4,<8"
