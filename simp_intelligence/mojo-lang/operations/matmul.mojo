@@ -16,8 +16,8 @@ from layout.layout_tensor import (
     LayoutTensor,
     copy_dram_to_sram_async,
 )
-from sys.info import has_nvidia_gpu_accelerator
 from utils import StaticTuple
+from math import ceildiv
 
 
 #@__llvm_metadata(MAX_THREADS_PER_BLOCK_METADATA=StaticTuple[Int32, 1](256))
@@ -40,11 +40,6 @@ fn naive_matmul[
         if row < M and col < N:
             for k in range(K):
                 dst_reg = dst_reg + A[row, k] * B[k, col]
-
-        if row == 1 and col == 2:
-            print(row, col, dst_reg)
-            C[1, 2] = 1234
-        else:
             C[row, col] = dst_reg
 
 
@@ -78,8 +73,8 @@ struct MyMatMul[algorithm: StaticString]:
                 ]
             ](
                 A, B, output,
-                grid_dim=(N // BN, M // BM),
-                block_dim=(BN, BM),
+                grid_dim=(ceildiv(M, BM), ceildiv(N, BN)),
+                block_dim=(BM, BN),
             )
         else:
             raise Error("Unknown algorithm:", algorithm)
