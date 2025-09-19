@@ -43,6 +43,30 @@ fn naive_matmul[
             C[row, col] = dst_reg
 
 
+fn coalescing_matmul[
+        dtype: DType, A_layout: Layout, B_layout: Layout, C_layout: Layout
+    ](
+        A: LayoutTensor[dtype, A_layout, MutableAnyOrigin],
+        B: LayoutTensor[dtype, B_layout, MutableAnyOrigin],
+        C: LayoutTensor[dtype, C_layout, MutableAnyOrigin],
+    ):
+        var M = A.dim[0]()
+        var K = B.dim[0]()
+        var N = B.dim[1]()
+
+	# With this change, adjacent threads access values in the same row,
+	# which are contiguous in memory.
+        var row = block_dim.y * block_idx.y + thread_idx.y # slow
+        var col = block_dim.x * block_idx.x + thread_idx.x # fast
+
+        var dst_reg: C.element_type = 0
+
+        if row < M and col < N:
+            for k in range(K):
+                dst_reg = dst_reg + A[row, k] * B[k, col]
+            C[row, col] = dst_reg
+
+
 @compiler.register("my_matmul")
 struct MyMatMul[algorithm: StaticString]:
     @staticmethod
@@ -52,7 +76,7 @@ struct MyMatMul[algorithm: StaticString]:
         raw_B: InputTensor[dtype = raw_output.dtype, rank = raw_output.rank],
         ctx: DeviceContextPtr,
     ) raises:
-        print("algo: " + algorithm)
+        #print("algo: " + algorithm)
         device_ctx = ctx.get_device_context()
 
         A = raw_A.to_layout_tensor()
@@ -76,6 +100,18 @@ struct MyMatMul[algorithm: StaticString]:
                 grid_dim=(ceildiv(M, BM), ceildiv(N, BN)),
                 block_dim=(BM, BN),
             )
+
+        elif algorithm == "coalescing":
+            device_ctx.enqueue_function[
+                coalescing_matmul[
+                    output.dtype, A.layout, B.layout, output.layout
+                ]
+            ](
+                A, B, output,
+                grid_dim=(ceildiv(N, BN), ceildiv(M, BM)),
+                block_dim=(BN, BM),
+            )
+
         else:
             raise Error("Unknown algorithm:", algorithm)
 
