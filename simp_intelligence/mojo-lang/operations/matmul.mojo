@@ -127,8 +127,8 @@ fn tiled_matmul[
             copy_dram_to_sram_async[thread_layout=A_tile_layout](A_smem, A_tile)
             copy_dram_to_sram_async[thread_layout=B_tile_layout](B_smem, B_tile)
 
-            async_copy_wait_all() # memory operation waiting
-            barrier()
+            async_copy_wait_all() # this only means "the copy this thread launched is done"
+            barrier() # this is needed to avoid stale contents @ smem[tile_row or tile_col]
 
             for k in range(BK):
                 dst_reg += A_smem[tile_row, k] * B_smem[k, tile_col]
