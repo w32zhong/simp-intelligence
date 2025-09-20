@@ -117,8 +117,8 @@ fn tiled_matmul[
         var dst_reg: C.element_type = 0
 
         for block in range(ceildiv(K, BK)):
-            alias A_tile_layout = Layout.row_major(NUM_THREADS // BK, BK)
-            alias B_tile_layout = Layout.row_major(BK, NUM_THREADS // BK)
+            alias A_tile_layout = Layout.row_major(BM, BK)
+            alias B_tile_layout = Layout.row_major(BK, BN)
 
             var A_tile = A.tile[BM, BK](block_idx.y, block)
             var B_tile = B.tile[BK, BN](block, block_idx.x)
@@ -162,8 +162,8 @@ fn tiled_register_matmul[
         dst_reg.copy_from(dst_subtile) # copy the initial zeros
 
         for block in range(ceildiv(K, BK)):
-            alias A_tile_layout = Layout.row_major(NUM_THREADS // BK, BK)
-            alias B_tile_layout = Layout.row_major(BK, NUM_THREADS // BK)
+            alias A_tile_layout = Layout.row_major(BM, BK)
+            alias B_tile_layout = Layout.row_major(BK, BN)
 
             var A_tile = A.tile[BM, BK](block_idx.y, block)
             var B_tile = B.tile[BK, BN](block, block_idx.x)
@@ -174,7 +174,6 @@ fn tiled_register_matmul[
             async_copy_wait_all()
             barrier()
 
-            # MODIFIED
             for k in range(BK):
                 var A_subtile = A_smem.tile[TM, 1](subtile_row, k)
                 var B_subtile = A_smem.tile[1, BN](k, 0)
@@ -252,7 +251,7 @@ struct MyMatMul[algorithm: StaticString]:
             )
 
         elif algorithm == "tiled_register":
-            alias TM = 8
+            alias TM = 4
             alias NUM_THREADS = (BM * BN) // TM
             device_ctx.enqueue_function[
                 tiled_register_matmul[
