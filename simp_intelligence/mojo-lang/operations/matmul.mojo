@@ -138,6 +138,56 @@ fn tiled_matmul[
         dst_tile[tile_row, tile_col] += dst_reg
 
 
+fn tiled_register_matmul[
+        dtype: DType, A_layout: Layout, B_layout: Layout, C_layout: Layout,
+        BM: Int, BK: Int, BN: Int, TM: Int, NUM_THREADS: Int
+    ](
+        A: LayoutTensor[dtype, A_layout, MutableAnyOrigin],
+        B: LayoutTensor[dtype, B_layout, MutableAnyOrigin],
+        C: LayoutTensor[dtype, C_layout, MutableAnyOrigin],
+    ):
+        var M = A.dim[0]()
+        var K = B.dim[0]()
+        var N = B.dim[1]()
+
+        var subtile_row = thread_idx.x // BN
+        var subtile_col = thread_idx.x % BN
+
+        var A_smem = tensor_builder[dtype]().row_major[BM, BK]().shared().alloc()
+        var B_smem = tensor_builder[dtype]().row_major[BK, BN]().shared().alloc()
+
+        var dst_subtile = C.tile[BM, BN](block_idx.y, block_idx.x)
+                          .tile[TM, 1](subtile_row, subtile_col)
+        var dst_reg = tensor_builder[dtype]().layout[TM]().local().alloc()
+        dst_reg.copy_from(dst_subtile) # copy the initial zeros
+
+        for block in range(ceildiv(K, BK)):
+            alias A_tile_layout = Layout.row_major(NUM_THREADS // BK, BK)
+            alias B_tile_layout = Layout.row_major(BK, NUM_THREADS // BK)
+
+            var A_tile = A.tile[BM, BK](block_idx.y, block)
+            var B_tile = B.tile[BK, BN](block, block_idx.x)
+
+            copy_dram_to_sram_async[thread_layout=A_tile_layout](A_smem, A_tile)
+            copy_dram_to_sram_async[thread_layout=B_tile_layout](B_smem, B_tile)
+
+            async_copy_wait_all()
+            barrier()
+
+            # MODIFIED
+            for k in range(BK):
+                var A_subtile = A_smem.tile[TM, 1](subtile_row, k)
+                var B_subtile = A_smem.tile[1, BN](k, 0)
+                var B_element = B_subtile[0, subtile_col]
+
+                for t in range(TM):
+                    dst_reg[t] += A_subtile[t, 0] * B_element
+
+            barrier()
+
+        dst_subtile.copy_from(dst_reg) # NEW
+
+
 @compiler.register("my_matmul")
 struct MyMatMul[algorithm: StaticString]:
     @staticmethod
@@ -194,6 +244,20 @@ struct MyMatMul[algorithm: StaticString]:
                 tiled_matmul[
                     output.dtype, A.layout, B.layout, output.layout,
                     BM, BK, BN, NUM_THREADS
+                ]
+            ](
+                A, B, output,
+                grid_dim=(ceildiv(N, BN), ceildiv(M, BM)),
+                block_dim=NUM_THREADS,
+            )
+
+        elif algorithm == "tiled_register":
+            alias TM = 8
+            alias NUM_THREADS = (BM * BN) // TM
+            device_ctx.enqueue_function[
+                tiled_register_matmul[
+                    output.dtype, A.layout, B.layout, output.layout,
+                    BM, BK, BN, TM, NUM_THREADS
                 ]
             ](
                 A, B, output,
