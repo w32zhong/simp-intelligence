@@ -11,27 +11,28 @@ fn example_tensor[rows: Int, columns: Int, base: Int =100]() -> LayoutTensor[
             ).alloc()
     for r in range(rows):
         for c in range(columns):
-            t[r, c] = (r + 1) * base + c
+            t[r, c] = (r + 1) * (1000 + base) + c
     return t
 
 fn main():
-    var A = example_tensor[9, 8, 10]()
-    var B = example_tensor[8, 16, 1000]()
-    var C = example_tensor[9, 16, 100]()
+    var A = example_tensor[8, 8, 100]()
+    var B = example_tensor[8, 16, 200]()
+    var C = example_tensor[8, 16, 0]()
     print(A, end="\n\n")
     print(B, end="\n\n")
     print(C, end="\n\n")
 
-    M, N = A.dim[0](), B.dim[1]() # (9, 16)
+    M, N = A.dim[0](), B.dim[1]() # (8, 16)
     alias BM = 4
     alias BN = 4
     alias BK = 2
-    alias TM = 4
+    alias TM = 2
     alias NUM_THREADS = (BM * BN) // TM
-    grid_dim=(ceildiv(N, BN), ceildiv(M, BM)) # (4, 3)
-    block_dim=NUM_THREADS # 4
+    grid_dim=(ceildiv(N, BN), ceildiv(M, BM)) # (4, 2)
+    block_dim=NUM_THREADS # 8
     tiled_register_matmul[C.dtype, A.layout, B.layout, C.layout, BM, BK, BN, TM, NUM_THREADS](
-        A, B, C, 2, 1, 3
+        A, B, C,
+        block_idx_x=2, block_idx_y=1, thread_idx_x=5
     )
 
 from math import ceildiv
@@ -56,7 +57,6 @@ fn tiled_register_matmul[
         var B_smem = tensor_builder[dtype]().row_major[BK, BN]().alloc()
 
         var dst_tile = C.tile[BM, BN](block_idx_y, block_idx_x)
-        print(dst_tile)
         var dst_subtile = dst_tile.tile[TM, 1](subtile_row, subtile_col)
         var dst_reg = tensor_builder[dtype]().layout[TM]().alloc()
         dst_reg.copy_from(dst_subtile) # copy the initial zeros
@@ -73,11 +73,11 @@ fn tiled_register_matmul[
 
             for k in range(BK):
                 var A_subtile = A_smem.tile[TM, 1](subtile_row, k)
-                var B_subtile = A_smem.tile[1, BN](k, 0)
+                var B_subtile = B_smem.tile[1, BN](k, 0)
                 var B_element = B_subtile[0, subtile_col]
 
                 for t in range(TM):
                     dst_reg[t] += A_subtile[t, 0] * B_element
 
         dst_subtile.copy_from(dst_reg)
-        #print(dst_subtile)
+        print(dst_subtile)
