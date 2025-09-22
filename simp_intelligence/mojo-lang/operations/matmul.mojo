@@ -176,7 +176,7 @@ fn tiled_register_matmul[
 
             for k in range(BK):
                 var A_subtile = A_smem.tile[TM, 1](subtile_row, k)
-                var B_subtile = A_smem.tile[1, BN](k, 0)
+                var B_subtile = B_smem.tile[1, BN](k, 0)
                 var B_element = B_subtile[0, subtile_col]
 
                 for t in range(TM):
