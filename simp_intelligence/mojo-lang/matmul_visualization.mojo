@@ -1,4 +1,4 @@
-from layout.tensor_builder import LayoutTensorBuild as tensor_builder, static
+from layout.tensor_builder import LayoutTensorBuild as tensor_builder
 from layout.layout_tensor import Layout, LayoutTensor
 
 fn example_tensor[rows: Int, columns: Int, base: Int =100]() -> LayoutTensor[
@@ -6,13 +6,11 @@ fn example_tensor[rows: Int, columns: Int, base: Int =100]() -> LayoutTensor[
     Layout.row_major(rows, columns),
     MutableAnyOrigin,
 ]:
-    var t = tensor_builder[DType.int32]().row_major(
-                static[rows](), static[columns]()
-            ).alloc()
+    var t = tensor_builder[DType.int32]().row_major[rows, columns]().alloc()
     for r in range(rows):
         for c in range(columns):
             t[r, c] = (r + 1) * (1000 + base) + c
-    return t
+    return rebind[LayoutTensor[DType.int32, Layout.row_major(rows, columns), MutableAnyOrigin]](t)
 
 fn main():
     var A = example_tensor[8, 8, 100]()
