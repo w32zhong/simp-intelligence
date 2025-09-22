@@ -168,10 +168,12 @@ fn tiled_register_matmul[
             var A_tile = A.tile[BM, BK](block_idx.y, block)
             var B_tile = B.tile[BK, BN](block, block_idx.x)
 
-            copy_dram_to_sram_async[thread_layout=A_tile_layout](A_smem, A_tile)
-            copy_dram_to_sram_async[thread_layout=B_tile_layout](B_smem, B_tile)
+            #copy_dram_to_sram_async[thread_layout=A_tile_layout](A_smem, A_tile)
+            #copy_dram_to_sram_async[thread_layout=B_tile_layout](B_smem, B_tile)
 
-            async_copy_wait_all()
+            #async_copy_wait_all()
+            A_smem.copy_from(A_tile)
+            B_smem.copy_from(B_tile)
             barrier()
 
             for k in range(BK):
@@ -184,7 +186,7 @@ fn tiled_register_matmul[
 
             barrier()
 
-        dst_subtile.copy_from(dst_reg) # NEW
+        dst_subtile.copy_from(dst_reg)
 
 
 @compiler.register("my_matmul")
@@ -253,6 +255,7 @@ struct MyMatMul[algorithm: StaticString]:
         elif algorithm == "tiled_register":
             alias TM = 4
             alias NUM_THREADS = (BM * BN) // TM
+
             device_ctx.enqueue_function[
                 tiled_register_matmul[
                     output.dtype, A.layout, B.layout, output.layout,
