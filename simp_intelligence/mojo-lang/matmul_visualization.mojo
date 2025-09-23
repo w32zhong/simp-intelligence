@@ -1,7 +1,8 @@
 from layout.tensor_builder import LayoutTensorBuild as tensor_builder
 from layout.layout_tensor import Layout, LayoutTensor
+from math import ceildiv
 
-fn example_tensor[rows: Int, columns: Int, base: Int =100]() -> LayoutTensor[
+fn example_tensor[rows: Int, columns: Int, zero_out: Bool = False]() -> LayoutTensor[
     DType.int32,
     Layout.row_major(rows, columns),
     MutableAnyOrigin,
@@ -9,31 +10,48 @@ fn example_tensor[rows: Int, columns: Int, base: Int =100]() -> LayoutTensor[
     var t = tensor_builder[DType.int32]().row_major[rows, columns]().alloc()
     for r in range(rows):
         for c in range(columns):
-            t[r, c] = (r + 1) * (1000 + base) + c
-    return rebind[LayoutTensor[DType.int32, Layout.row_major(rows, columns), MutableAnyOrigin]](t)
+            if zero_out:
+                t[r, c] = 0
+            else:
+                t[r, c] = 100 * (10 + r) + c
+    return rebind[
+            LayoutTensor[
+                DType.int32,
+                Layout.row_major(rows, columns),
+                MutableAnyOrigin
+            ]
+        ](t)
 
 fn main():
-    var A = example_tensor[8, 8, 100]()
-    var B = example_tensor[8, 16, 200]()
-    var C = example_tensor[8, 16, 0]()
+    #alias M = 4096
+    #alias K = 6144
+    #alias N = 2048
+    alias M = 32
+    alias K = 32
+    alias N = 32
+
+    var A = example_tensor[M, K]()
+    var B = example_tensor[K, N]()
+    var C = example_tensor[M, N, zero_out=True]()
     print(A, end="\n\n")
     print(B, end="\n\n")
     print(C, end="\n\n")
 
-    M, N = A.dim[0](), B.dim[1]() # (8, 16)
-    alias BM = 4
-    alias BN = 4
-    alias BK = 2
-    alias TM = 2
+    alias BM = 16
+    alias BN = 16
+    alias BK = 16
+    alias TM = 4
     alias NUM_THREADS = (BM * BN) // TM
-    grid_dim=(ceildiv(N, BN), ceildiv(M, BM)) # (4, 2)
-    block_dim=NUM_THREADS # 8
-    tiled_register_matmul[C.dtype, A.layout, B.layout, C.layout, BM, BK, BN, TM, NUM_THREADS](
+    grid_dim=(ceildiv(N, BN), ceildiv(M, BM))
+    block_dim=NUM_THREADS
+    tiled_register_matmul[
+        C.dtype, A.layout, B.layout, C.layout, BM, BK, BN, TM, NUM_THREADS
+    ](
         A, B, C,
         block_idx_x=2, block_idx_y=1, thread_idx_x=5
     )
+    print(C)
 
-from math import ceildiv
 fn tiled_register_matmul[
         dtype: DType, A_layout: Layout, B_layout: Layout, C_layout: Layout,
         BM: Int, BK: Int, BN: Int, TM: Int, NUM_THREADS: Int
@@ -78,4 +96,3 @@ fn tiled_register_matmul[
                     dst_reg[t] += A_subtile[t, 0] * B_element
 
         dst_subtile.copy_from(dst_reg)
-        print(dst_subtile)
