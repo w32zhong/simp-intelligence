@@ -1,3 +1,4 @@
 .pixi
+__pycache__/
 .ipynb_checkpoints
 .jupyter_ystore.*
