@@ -1,3 +1,6 @@
+# About
+This is my learning environment and playground for GPU-stack software and AI algorithms.
+
 ## Quick start
 ```sh
 pixi install
