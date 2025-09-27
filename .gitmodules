@@ -1,0 +1,3 @@
+[submodule "simp_intelligence/cute-dsl/hilt_src"]
+	path = simp_intelligence/cute-dsl/hilt_src
+	url = https://github.com/HanGuo97/hilt.git
