@@ -26,13 +26,13 @@ export PYTHONUNBUFFERED=1
 jupyter-notebook --autoreload .
 ```
 
-## Convert a notebook to source file
+## Convert a notebook to a source file
 ```sh
 pip install nbconvert
 jupyter nbconvert --to script foo.ipynb
 ```
 
-## Run a modified stdlib
+## Run a modified stdlib in Mojo
 ```sh
 # clone the 25.7.0.dev2025092205 upstream code to ./modular
 (cd ./modular && ./bazelw build //mojo/stdlib/stdlib)
