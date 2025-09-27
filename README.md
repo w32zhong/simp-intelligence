@@ -43,3 +43,12 @@ python simp_intelligence/triton-dsl/vec_add.py
 python -m triton.tools.compile --kernel-name matmul_kernel --kernel-name add_kernel --signature "*fp32,*fp32,*fp32,i32,64" --grid=1024,1024,1024 ./simp_intelligence/triton-dsl/vec_add.py
 rm -f *.[ch]
 ```
+
+## Using CUDA
+```sh
+cd simp_intelligence/cuda
+make clean && make
+make dump-hello_world.out
+ncu-ui dump-hello_world.out.ncu-rep
+nsys-ui dump-hello_world.out.nsys-rep
+```
