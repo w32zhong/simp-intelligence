@@ -1,9 +1,21 @@
 ## Quick start
 ```sh
-git submodule update --init --recursive
 pixi install
 pixi shell
+git submodule update --init --recursive
 pip install -e simp_intelligence/cute-dsl/hilt_src/
+```
+
+Verify system installations:
+```sh
+$ echo $CC
+/simp-intelligence/.pixi/envs/default/bin/x86_64-conda-linux-gnu-cc
+$ which nvcc
+/simp-intelligence/.pixi/envs/default/bin/nvcc
+$ nvcc --version
+...
+Cuda compilation tools, release 12.9, V12.9.86
+Build cuda_12.9.r12.9/compiler.36037853_0
 ```
 
 ```sh

@@ -14,9 +14,11 @@ notebook = ">=7.4.6,<8"
 graphviz = ">=13.1.2,<14"
 matplotlib = ">=3.10.6,<4"
 numpy = ">=2.3.3,<3"
-triton = ">=3.4.0,<4"
 pip = ">=25.2,<26"
 jupyter-collaboration = ">=4.1.1,<5"
+ipdb = ">=0.13.13,<0.14"
+cuda = ">=12.9.1,<13"
 
 [pypi-dependencies]
 nvidia-cutlass-dsl = ">=4.2.1, <5"
+triton = "*"
