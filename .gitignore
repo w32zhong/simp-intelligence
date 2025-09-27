@@ -1,5 +1,5 @@
-.pixi
-pixi.lock
+.venv
+*.lock
 __pycache__/
 .ipynb_checkpoints
 .jupyter_ystore.*

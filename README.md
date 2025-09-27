@@ -1,6 +1,9 @@
 ## Quick start
 ```sh
-pixi install
+uv sync
+```
+
+```sh
 export PYTHONUNBUFFERED=1
 pixi run jupyter-notebook --autoreload .
 ```
