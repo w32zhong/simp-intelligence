@@ -7,8 +7,6 @@ channels = ["https://conda.modular.com/max-nightly", "https://prefix.dev/conda-f
 [system-requirements]
 cuda = "12.0"
 
-[tasks]
-
 [dependencies]
 pytorch-gpu = ">=2.8.0,<3"
 modular = ">=25.7.0.dev2025092705,<26"
@@ -17,6 +15,8 @@ graphviz = ">=13.1.2,<14"
 matplotlib = ">=3.10.6,<4"
 numpy = ">=2.3.3,<3"
 triton = ">=3.4.0,<4"
+pip = ">=25.2,<26"
+jupyter-collaboration = ">=4.1.1,<5"
 
 [pypi-dependencies]
 nvidia-cutlass-dsl = ">=4.2.1, <5"
