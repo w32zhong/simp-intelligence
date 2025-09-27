@@ -51,4 +51,5 @@ make clean && make
 make dump-hello_world.out
 ncu-ui dump-hello_world.out.ncu-rep
 nsys-ui dump-hello_world.out.nsys-rep
+# https://www.youtube.com/watch?v=F_BazucyCMw
 ```
