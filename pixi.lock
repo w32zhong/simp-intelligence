@@ -563,6 +563,8 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/59/a3/57d2f674872f4e6b7da569b6df96ed80dc5c000cfd847ebeba5124faae4b/cuda_pathfinder-1.2.3-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/02/02/078f4cba58349faad5597306ca54bf0bf129f8c713b261e1def59468a505/cuda_python-13.0.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/02/ab/5bcc0c8c620af5d4acbc71abce10e3eb3023e50342e6bc29b6461f72530e/nvidia_cutlass_dsl-4.2.1-cp312-cp312-manylinux_2_28_x86_64.whl
+      - pypi: https://files.pythonhosted.org/packages/7f/96/d6d25a4c307d6645f4a9b91d620c0151c544ad38b5e371313a87d2761004/nvidia_ml_py-13.580.82-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/0e/b1/ed611dd58dec3a3a54a410fbf3c57511b76cef0adc5f03e6448b0749c514/nvitop-1.5.3-py3-none-any.whl
 packages:
 - conda: https://prefix.dev/conda-forge/linux-64/_openmp_mutex-4.5-4_kmp_llvm.conda
   build_number: 4
@@ -5942,6 +5944,30 @@ packages:
   - typing-extensions
   - cuda-python>=12.8
   requires_python: '>=3.10'
+- pypi: https://files.pythonhosted.org/packages/7f/96/d6d25a4c307d6645f4a9b91d620c0151c544ad38b5e371313a87d2761004/nvidia_ml_py-13.580.82-py3-none-any.whl
+  name: nvidia-ml-py
+  version: 13.580.82
+  sha256: 4361db337b0c551e2d101936dae2e9a60f957af26818e8c0c3a1f32b8db8d0a7
+- pypi: https://files.pythonhosted.org/packages/0e/b1/ed611dd58dec3a3a54a410fbf3c57511b76cef0adc5f03e6448b0749c514/nvitop-1.5.3-py3-none-any.whl
+  name: nvitop
+  version: 1.5.3
+  sha256: 5a58c8aea1a021ab0d3c4f1ceffca9335d82326ad7fbe0c6cd9d1f7b955777a5
+  requires_dist:
+  - nvidia-ml-py>=11.450.51,<13.581.0a0
+  - psutil>=5.6.6
+  - colorama>=0.4.0 ; sys_platform == 'win32'
+  - windows-curses>=2.2.0 ; sys_platform == 'win32'
+  - ruff ; extra == 'lint'
+  - pylint[spelling] ; extra == 'lint'
+  - xdoctest ; extra == 'lint'
+  - mypy ; extra == 'lint'
+  - typing-extensions ; extra == 'lint'
+  - pre-commit ; extra == 'lint'
+  - nvidia-ml-py==11.450.51 ; extra == 'cuda10'
+  - nvidia-ml-py>=11.450.51,<=11.525.150 ; extra == 'cuda11'
+  - nvidia-ml-py>=12.535.77,<=12.575.51 ; extra == 'cuda12'
+  - nvidia-ml-py==13.580.65 ; extra == 'cuda13'
+  requires_python: '>=3.8'
 - conda: https://prefix.dev/conda-forge/linux-64/ocl-icd-2.3.3-hb9d3cd8_0.conda
   sha256: 2254dae821b286fb57c61895f2b40e3571a070910fdab79a948ff703e1ea807b
   md5: 56f8947aa9d5cf37b0b3d43b83f34192
