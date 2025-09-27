@@ -1,6 +1,8 @@
 ## Quick start
 ```sh
+git submodule update --init --recursive
 uv sync
+python3 -m pip install -e ./simp_intelligence/cute-dsl/hilt_src/
 ```
 
 ```sh
