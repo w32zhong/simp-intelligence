@@ -1,6 +1,26 @@
 # About
 This is my learning environment and playground for GPU-stack software and AI algorithms.
 
+The SoTA GPU-stack software for LLM inference, in my view:
+```mermaid
+graph LR;
+  hgf[HuggingFace models] --> PyTorch;
+  hgf --> FLA --> Triton --> op_kernels;
+  MAX[Modular MAX] --> mojo_lib;
+  PyTorch --dispatch--> op_kernels;
+  SGLang --> PyTorch;
+  SGLang --> FlashInfer;
+  FlashInfer --> op_kernels;
+  FlashInfer --> CUDA;
+  FlashInfer --> CUTLASS;
+  CUTLASS --> CUDA --> op_kernels;
+  op_kernels[GPU operators] --> MLIR;
+  mojo_lib[Mojo library] --> mojo_lang;
+  mojo_lang[Mojo compiler] --> MLIR;
+  MLIR --> asm_OPT[optimizer passes];
+  asm_OPT --> GPU[GPU simulator]
+```
+
 ## Quick start
 ```sh
 pixi install
