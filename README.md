@@ -17,8 +17,9 @@ graph LR;
   op_kernels[GPU operators] --> MLIR;
   mojo_lib[Mojo library] --> mojo_lang;
   mojo_lang[Mojo compiler] --> MLIR;
-  MLIR --> asm_OPT[optimizer passes];
-  asm_OPT --> GPU[GPU simulator]
+  MLIR --> asm_OPT[optimizer passes / LLVM];
+  asm_OPT --> MLIR;
+  asm_OPT --> GPU[GPU];
 ```
 
 ## Quick start
