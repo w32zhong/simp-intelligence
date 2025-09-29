@@ -470,6 +470,7 @@ environments:
       - conda: https://prefix.dev/conda-forge/noarch/rfc3987-syntax-1.1.0-pyhe01879c_1.conda
       - conda: https://prefix.dev/conda-forge/noarch/rich-14.1.0-pyhe01879c_0.conda
       - conda: https://prefix.dev/conda-forge/noarch/rich-toolkit-0.15.1-pyhcf101f3_0.conda
+      - conda: https://prefix.dev/conda-forge/noarch/rpdb-0.1.6-py_1.tar.bz2
       - conda: https://prefix.dev/conda-forge/linux-64/rpds-py-0.27.1-py313h843e2db_1.conda
       - conda: https://prefix.dev/conda-forge/linux-64/s2n-1.5.26-h5ac9029_0.conda
       - conda: https://prefix.dev/conda-forge/linux-64/safetensors-0.6.2-py313h5c7d99a_1.conda
@@ -7212,6 +7213,17 @@ packages:
   - pkg:pypi/rich-toolkit?source=compressed-mapping
   size: 29432
   timestamp: 1756998936181
+- conda: https://prefix.dev/conda-forge/noarch/rpdb-0.1.6-py_1.tar.bz2
+  sha256: 94a85930cce4351b818022863ed28ab5991ca8517ff474d1f539dd58dd5c288c
+  md5: b918834b6311cfda6b897a707c64b124
+  depends:
+  - python
+  license: ISC (ISCL)
+  license_family: OTHER
+  purls:
+  - pkg:pypi/rpdb?source=hash-mapping
+  size: 7054
+  timestamp: 1580419996567
 - conda: https://prefix.dev/conda-forge/linux-64/rpds-py-0.27.1-py313h843e2db_1.conda
   sha256: a976e90dbd229f7dcd357b0f9a5b637bf85243f3a3e844c1e266472cae53e359
   md5: 06c117e49934b564ef9ff6e61f279301
