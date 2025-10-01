@@ -335,6 +335,7 @@ environments:
       - conda: https://prefix.dev/conda-forge/linux-64/libtiff-4.7.1-h8261f1e_0.conda
       - conda: https://prefix.dev/conda-forge/linux-64/libtorch-2.8.0-cuda129_mkl_h502773c_300.conda
       - conda: https://prefix.dev/conda-forge/linux-64/libudev1-257.9-h085a93f_0.conda
+      - conda: https://prefix.dev/conda-forge/linux-64/libunwind-1.8.3-h65a8314_0.conda
       - conda: https://prefix.dev/conda-forge/linux-64/libutf8proc-2.11.0-hb04c3b8_0.conda
       - conda: https://prefix.dev/conda-forge/linux-64/libuuid-2.41.2-he9a06e4_0.conda
       - conda: https://prefix.dev/conda-forge/linux-64/libuv-1.51.0-hb03c661_1.conda
@@ -425,6 +426,7 @@ environments:
       - conda: https://prefix.dev/conda-forge/linux-64/pthread-stubs-0.4-hb9d3cd8_1002.conda
       - conda: https://prefix.dev/conda-forge/noarch/ptyprocess-0.7.0-pyhd8ed1ab_1.conda
       - conda: https://prefix.dev/conda-forge/noarch/pure_eval-0.2.3-pyhd8ed1ab_1.conda
+      - conda: https://prefix.dev/conda-forge/linux-64/py-spy-0.4.1-he182f42_0.conda
       - conda: https://prefix.dev/conda-forge/linux-64/pyarrow-21.0.0-py313h78bf25f_0.conda
       - conda: https://prefix.dev/conda-forge/linux-64/pyarrow-core-21.0.0-py313hc6b0d6e_0_cuda.conda
       - conda: https://prefix.dev/conda-forge/noarch/pybind11-2.13.6-pyhc790b64_3.conda
@@ -5112,6 +5114,18 @@ packages:
   purls: []
   size: 144265
   timestamp: 1757520342166
+- conda: https://prefix.dev/conda-forge/linux-64/libunwind-1.8.3-h65a8314_0.conda
+  sha256: 71c8b9d5c72473752a0bb6e91b01dd209a03916cb71f36cc6a564e3a2a132d7a
+  md5: e179a69edd30d75c0144d7a380b88f28
+  depends:
+  - __glibc >=2.17,<3.0.a0
+  - libgcc >=14
+  - libstdcxx >=14
+  license: MIT
+  license_family: MIT
+  purls: []
+  size: 75995
+  timestamp: 1757032240102
 - conda: https://prefix.dev/conda-forge/linux-64/libutf8proc-2.11.0-hb04c3b8_0.conda
   sha256: f8977233dc19cb8530f3bc71db87124695db076e077db429c3231acfa980c4ac
   md5: 34fb73fd2d5a613d8f17ce2eaa15a8a5
@@ -6487,6 +6501,20 @@ packages:
   - pkg:pypi/pure-eval?source=hash-mapping
   size: 16668
   timestamp: 1733569518868
+- conda: https://prefix.dev/conda-forge/linux-64/py-spy-0.4.1-he182f42_0.conda
+  sha256: db9cdedc96e69f84e767777de8ab29e78053afa731090d877df14b494d3e033f
+  md5: 9e579cfee141d018f6faa71d02fea1d5
+  depends:
+  - __glibc >=2.17,<3.0.a0
+  - libgcc >=14
+  - libunwind >=1.8.2,<1.9.0a0
+  constrains:
+  - __glibc >=2.17
+  license: MIT
+  license_family: MIT
+  purls: []
+  size: 1763548
+  timestamp: 1754007800827
 - conda: https://prefix.dev/conda-forge/linux-64/pyarrow-21.0.0-py313h78bf25f_0.conda
   sha256: 5d0f17c0fbf8d5b78458bc616d5bfaf9812aa9cc81e9e38b21e61787a5060199
   md5: 1580ddd94606ccb60270877cb8838562
