@@ -9,7 +9,7 @@ cuda = "12.0"
 
 [dependencies]
 pytorch-gpu = ">=2.8.0,<3"
-modular = ">=25.7.0.dev2025092705,<26"
+modular = "==25.7"
 notebook = ">=7.4.6,<8"
 graphviz = ">=13.1.2,<14"
 matplotlib = ">=3.10.6,<4"
