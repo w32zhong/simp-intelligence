@@ -5,7 +5,7 @@ from visualization_utils import block_idx, thread_idx, barrier, example_logged_t
 from math import ceildiv
 
 
-fn tiled_register_matmul[
+def tiled_register_matmul[
         dtype: DType, A_layout: Layout, B_layout: Layout, C_layout: Layout,
         BM: Int, BK: Int, BN: Int, TM: Int, COMPUTE_THREADS: Int,
         NUM_THREADS: Int, version: StaticString,
@@ -13,7 +13,7 @@ fn tiled_register_matmul[
         A: LayoutTensor[dtype, A_layout, MutAnyOrigin],
         B: LayoutTensor[dtype, B_layout, MutAnyOrigin],
         C: LayoutTensor[dtype, C_layout, MutAnyOrigin],
-    ) raises:
+    ):
         var M = A.dim[0]()
         var K = B.dim[0]()
         var N = B.dim[1]()
@@ -90,6 +90,8 @@ fn main() raises:
     A.print()
     B = example_logged_tensor[K, N]("B")
     B.print()
+    #test_B_tile = B.tile[3, 4](1, 1)
+    #test_B_tile.print()
     C = example_logged_tensor[M, N]("C")
 
     comptime OPTIMIZED_BLOCK_SIZE = 16
@@ -101,6 +103,9 @@ fn main() raises:
     comptime COPY_THREADS = max(BM * BK, BK * BN)
     comptime NUM_THREADS = max(COMPUTE_THREADS, COPY_THREADS)
     comptime version = 'whatever'
+
+    block_idx.set_dim3(2, 1)
+    thread_idx.set_dim3(3)
 
     tiled_register_matmul[
         DType.float32,
