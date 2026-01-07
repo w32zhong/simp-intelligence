@@ -87,7 +87,9 @@ fn main() raises:
     alias K = 6144
     alias N = 2048
     A = example_logged_tensor[M, K]("A")
+    A.print()
     B = example_logged_tensor[K, N]("B")
+    B.print()
     C = example_logged_tensor[M, N]("C")
 
     comptime OPTIMIZED_BLOCK_SIZE = 16

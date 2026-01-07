@@ -65,19 +65,31 @@ struct LoggedTensor[
         self.origin_x = origin_x
         self.origin_y = origin_y
 
-    fn print(read self) raises:
-        max_rows = min(self.impl.shape[0](), 100)
-        max_cols = min(self.impl.shape[1](), 30)
-        print("{}@[{}, {}]".format(
-            self.name, self.origin_x, self.origin_y
+    fn print(read self, max_rows: Int = 12, max_cols: Int = 8) raises:
+        print("LoggedTensor: name={} layout={} coordinates=({}, {})".format(
+            self.name, String(self.impl.runtime_layout),
+            self.origin_x, self.origin_y
         ), end=":\n")
-        for row in range(max_rows):
-            for col in range(max_cols):
+        var n_rows = self.impl.shape[0]()
+        var n_cols = self.impl.shape[1]()
+        var last_row: Int = 0
+        for row in range(min(n_rows, max_rows)):
+            var last_col: Int = 0
+            for col in range(min(n_cols, max_cols)):
                 print(
                     String(self.impl[row, col]).rjust(5),
                     end=""
                 )
-            print()
+                last_col = col
+            if last_col + 1 == max_cols and last_col + 1 != n_cols:
+                print(' ...')
+            else:
+                print()
+            last_row = row
+        if last_row + 1 == max_rows and last_row + 1 != n_rows:
+            for _ in range(min(n_cols, max_cols)):
+                print("...".rjust(5), end="")
+        print()
 
     fn dim[idx: Int](self) -> Int:
         return self.impl.dim[idx]()
