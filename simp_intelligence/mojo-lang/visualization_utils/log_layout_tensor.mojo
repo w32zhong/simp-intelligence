@@ -99,34 +99,37 @@ struct LoggedTensor[
                 print("...".rjust(5), end="")
         print()
 
-    fn log(read self, filename: StaticString = "tmp") raises:
+    fn log(read self, filename: StaticString = "tmp", **kwargs: Int) raises:
         var x = self.origin_x
         var y = self.origin_y
         var n_rows = self.impl.shape[0]()
         var n_cols = self.impl.shape[1]()
+        var json_contents = """
+            "thread_id.x": {},
+            "thread_id.y": {},
+            "thread_id.z": {},
+            "block_id.x": {},
+            "block_id.y": {},
+            "block_id.z": {},
+            "n_rows": {},
+            "n_cols": {},
+            "x": {},
+            "y": {},
+        """.format(
+            thread_idx.x, thread_idx.y, thread_idx.z,
+            block_idx.x, block_idx.y, block_idx.z,
+            n_rows, n_cols, x, y
+        ).replace(
+            " ", ""
+        ).replace(
+            "\n", ""
+        )
+
+        for item in kwargs.items():
+            json_contents += '"{}":{},'.format(item.key, item.value)
 
         with open(filename + ".log", "a") as fh:
-            fh.write('{' + """
-                "thread_id.x": {},
-                "thread_id.y": {},
-                "thread_id.z": {},
-                "block_id.x": {},
-                "block_id.y": {},
-                "block_id.z": {},
-                "n_rows": {},
-                "n_cols": {},
-                "x": {},
-                "y": {}
-                """
-                .format(
-                    thread_idx.x, thread_idx.y, thread_idx.z,
-                    block_idx.x, block_idx.y, block_idx.z,
-                    n_rows, n_cols, x, y
-                ).replace(
-                    " ", ""
-                ).replace(
-                    "\n", ""
-                ) + '}\n'
+            fh.write('{' + json_contents.rstrip(',') + '}\n'
             )
 
     fn dim[idx: Int](self) -> Int:

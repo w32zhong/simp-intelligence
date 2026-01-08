@@ -51,8 +51,8 @@ def tiled_register_matmul[
         var dst_subtile = C.tile[BM, BN](block_idx.y, block_idx.x)
                            .tile[TM, 1](subtile_row, subtile_col)
 
-        C.tile[BM, BN](block_idx.y, block_idx.x).log(filename='block_tile')
-        dst_subtile.log(filename='thread_tile')
+        #C.tile[BM, BN](block_idx.y, block_idx.x).log(filename='block_tile')
+        dst_subtile.log(filename='thread_tile', foo=123, bar=321)
         return
 
         dst_reg.copy_from(dst_subtile)
@@ -94,9 +94,9 @@ def tiled_register_matmul[
 fn main() raises:
     clear_log_files()
 
-    alias M = 480
-    alias K = 560
-    alias N = 240
+    alias M = 48
+    alias K = 56
+    alias N = 24
     A = example_logged_tensor[M, K]("A")
     A.print()
     B = example_logged_tensor[K, N]("B")
