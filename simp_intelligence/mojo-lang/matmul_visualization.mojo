@@ -51,9 +51,8 @@ def tiled_register_matmul[
         var dst_subtile = C.tile[BM, BN](block_idx.y, block_idx.x)
                            .tile[TM, 1](subtile_row, subtile_col)
 
-        #C.tile[BM, BN](block_idx.y, block_idx.x).log(filename='block_tile')
-        dst_subtile.log(filename='thread_tile', foo=123, bar=321)
-        return
+        C.tile[BM, BN](block_idx.y, block_idx.x).log(filename='block_tile')
+        dst_subtile.log(filename='thread_tile')
 
         dst_reg.copy_from(dst_subtile)
 
@@ -66,24 +65,23 @@ def tiled_register_matmul[
             var A_tile = A.tile[BM, BK](block_idx.y, block)
             var B_tile = B.tile[BK, BN](block, block_idx.x)
 
-            if thread_idx.x == 3 and block_idx.x == 30 and block_idx.y == 20:
-                A_tile.log(filename='A_tile')
-                B_tile.log(filename='B_tile')
+            A_tile.log(filename='A_tile', block=block)
+            B_tile.log(filename='B_tile', block=block)
 
             A_smem.copy_from(A_tile)
             B_smem.copy_from(B_tile)
 
             barrier()
 
-            if participates_in_compute:
-                for k in range(BK):
-                    var A_subtile = A_smem.tile[TM, 1](subtile_row, k)
-                    var B_subtile = B_smem.tile[1, BN](k, 0)
-                    var B_element = B_subtile[0, subtile_col]
+            #if participates_in_compute:
+            #    for k in range(BK):
+            #        var A_subtile = A_smem.tile[TM, 1](subtile_row, k)
+            #        var B_subtile = B_smem.tile[1, BN](k, 0)
+            #        var B_element = B_subtile[0, subtile_col]
 
-                    for t in range(TM):
-                        product = A_subtile[t, 0] * B_element
-                        dst_reg[t] += product
+            #        for t in range(TM):
+            #            product = A_subtile[t, 0] * B_element
+            #            dst_reg[t] += product
 
             barrier()
 

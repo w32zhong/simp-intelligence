@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Matrix GEMM Visualization</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="script.js" defer></script>
+</head>
+<body>
+    <div class="container">
+        <h1>Matrix GEMM Visualization</h1>
+        <div class="loading" id="loading">Loading Data...</div>
+        
+        <div class="main-content" id="mainContent" style="display: none;">
+            <div class="controls">
+                <div class="control-group">
+                    <label for="blockCol">block_id.x: <span id="valBlockCol">0</span></label>
+                    <input type="range" id="blockCol" min="0" value="0">
+                </div>
+                <div class="control-group">
+                    <label for="blockRow">block_id.y: <span id="valBlockRow">0</span></label>
+                    <input type="range" id="blockRow" min="0" value="0">
+                </div>
+                <div class="control-group">
+                    <label for="blockK">K: <span id="valBlockK">0</span></label>
+                    <input type="range" id="blockK" min="0" value="0">
+                </div>
+                <div class="control-group">
+                    <label for="threadID">thread_id: <span id="valThreadID">0</span></label>
+                    <input type="range" id="threadID" min="0" value="0">
+                </div>
+                <div class="control-group">
+                    <label for="scale">Zoom Scale: <span id="valScale">5</span></label>
+                    <input type="range" id="scale" min="1" max="10" value="5">
+                </div>
+            </div>
+
+            <!-- Visualization Grid Layout -->
+            <div class="vis-grid">
+                <div class="vis-cell empty"></div>
+                <div class="vis-cell matrix-container" id="containerB">
+                    <div class="matrix-label">Matrix B (K x N)</div>
+                    <canvas id="canvasB"></canvas>
+                </div>
+                <div class="vis-cell matrix-container" id="containerA">
+                    <div class="matrix-label">Matrix A (M x K)</div>
+                    <canvas id="canvasA"></canvas>
+                </div>
+                <div class="vis-cell matrix-container" id="containerC">
+                    <div class="matrix-label">Matrix C (M x N)</div>
+                    <canvas id="canvasC"></canvas>
+                </div>
+            </div>
+            
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="color-box block-color"></div>
+                    <span>Target Block (C)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="color-box thread-color"></div>
+                    <span>Target Thread (C)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="color-box input-color"></div>
+                    <span>Input Tile (A & B)</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
