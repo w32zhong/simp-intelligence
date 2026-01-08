@@ -1,6 +1,22 @@
 from layout import LayoutTensor, Layout
 from gpu.memory import AddressSpace
 from random import random_si64
+from memory import UnsafePointer, Span, alloc
+from sys import size_of
+
+
+@register_passable("trivial")
+struct LogDataItem:
+    var rows: Int64
+    var cols: Int64
+    var x: Int64
+    var y: Int64
+
+    fn __init__(out self, rows: Int64, cols: Int64, x: Int64, y: Int64):
+        self.rows = rows
+        self.cols = cols
+        self.x = x
+        self.y = y
 
 
 fn _get_address_space_name[addr: AddressSpace]() -> String:
@@ -97,13 +113,25 @@ struct LoggedTensor[
                 print("...".rjust(5), end="")
         print()
 
-    fn log(read self, filename: StaticString = "tmp") raises:
+    fn log(read self, filename: StaticString = "tmp", binary: Bool = True) raises:
         var x = self.origin_x
         var y = self.origin_y
         var n_rows = self.impl.shape[0]()
         var n_cols = self.impl.shape[1]()
-        with open(filename + ".log", "a") as fh:
-            fh.write('{}x{}@({},{})\n'.format(n_rows, n_cols, x, y))
+
+        if binary:
+            var ptr = alloc[LogDataItem](1)
+            ptr[0] = LogDataItem(Int64(n_rows), Int64(n_cols), Int64(x), Int64(y))
+
+            with open(filename + ".bin.log", "a") as fh:
+                var byte_ptr = ptr.bitcast[UInt8]()
+                var span = Span[UInt8](ptr=byte_ptr, length=size_of[LogDataItem]())
+                fh.write_bytes(span)
+
+            ptr.free()
+        else:
+            with open(filename + ".log", "a") as fh:
+                fh.write('{}x{}@({},{})\n'.format(n_rows, n_cols, x, y))
 
     fn dim[idx: Int](self) -> Int:
         return self.impl.dim[idx]()
@@ -131,7 +159,7 @@ struct LoggedTensor[
         *tile_sizes: Int
     ](self, x: Int, y: Int) raises -> LoggedTensor[
         dtype,
-        Self.ImplType.TileType[*tile_sizes].layout, 
+        Self.ImplType.TileType[*tile_sizes].layout,
         origin,
         address_space=Self.ImplType.TileType[*tile_sizes].address_space,
         layout_int_type=Self.ImplType.TileType[*tile_sizes].layout_int_type,
@@ -149,7 +177,7 @@ struct LoggedTensor[
         alias NewT = Self.ImplType.TileType[*tile_sizes]
         return LoggedTensor[
             dtype,
-            NewT.layout, 
+            NewT.layout,
             origin,
             address_space=NewT.address_space,
             layout_int_type=NewT.layout_int_type,
