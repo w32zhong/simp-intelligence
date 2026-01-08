@@ -1,22 +1,8 @@
 from layout import LayoutTensor, Layout
 from gpu.memory import AddressSpace
 from random import random_si64
-from memory import UnsafePointer, Span, alloc
-from sys import size_of
-
-
-@register_passable("trivial")
-struct LogDataItem:
-    var rows: Int64
-    var cols: Int64
-    var x: Int64
-    var y: Int64
-
-    fn __init__(out self, rows: Int64, cols: Int64, x: Int64, y: Int64):
-        self.rows = rows
-        self.cols = cols
-        self.x = x
-        self.y = y
+from memory import UnsafePointer, alloc
+from . import block_idx, thread_idx
 
 
 fn _get_address_space_name[addr: AddressSpace]() -> String:
@@ -113,25 +99,35 @@ struct LoggedTensor[
                 print("...".rjust(5), end="")
         print()
 
-    fn log(read self, filename: StaticString = "tmp", binary: Bool = True) raises:
+    fn log(read self, filename: StaticString = "tmp") raises:
         var x = self.origin_x
         var y = self.origin_y
         var n_rows = self.impl.shape[0]()
         var n_cols = self.impl.shape[1]()
 
-        if binary:
-            var ptr = alloc[LogDataItem](1)
-            ptr[0] = LogDataItem(Int64(n_rows), Int64(n_cols), Int64(x), Int64(y))
-
-            with open(filename + ".bin.log", "a") as fh:
-                var byte_ptr = ptr.bitcast[UInt8]()
-                var span = Span[UInt8](ptr=byte_ptr, length=size_of[LogDataItem]())
-                fh.write_bytes(span)
-
-            ptr.free()
-        else:
-            with open(filename + ".log", "a") as fh:
-                fh.write('{}x{}@({},{})\n'.format(n_rows, n_cols, x, y))
+        with open(filename + ".log", "a") as fh:
+            fh.write('{' + """
+                "thread_id.x": {},
+                "thread_id.y": {},
+                "thread_id.z": {},
+                "block_id.x": {},
+                "block_id.y": {},
+                "block_id.z": {},
+                "n_rows": {},
+                "n_cols": {},
+                "x": {},
+                "y": {}
+                """
+                .format(
+                    thread_idx.x, thread_idx.y, thread_idx.z,
+                    block_idx.x, block_idx.y, block_idx.z,
+                    n_rows, n_cols, x, y
+                ).replace(
+                    " ", ""
+                ).replace(
+                    "\n", ""
+                ) + '}\n'
+            )
 
     fn dim[idx: Int](self) -> Int:
         return self.impl.dim[idx]()

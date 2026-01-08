@@ -51,8 +51,9 @@ def tiled_register_matmul[
         var dst_subtile = C.tile[BM, BN](block_idx.y, block_idx.x)
                            .tile[TM, 1](subtile_row, subtile_col)
 
-        C.tile[BM, BN](block_idx.y, block_idx.x).print()
-        dst_subtile.print()
+        C.tile[BM, BN](block_idx.y, block_idx.x).log(filename='block_tile')
+        dst_subtile.log(filename='thread_tile')
+        return
 
         dst_reg.copy_from(dst_subtile)
 
@@ -65,21 +66,24 @@ def tiled_register_matmul[
             var A_tile = A.tile[BM, BK](block_idx.y, block)
             var B_tile = B.tile[BK, BN](block, block_idx.x)
 
-            A_tile.log()
+            if thread_idx.x == 3 and block_idx.x == 30 and block_idx.y == 20:
+                A_tile.log(filename='A_tile')
+                B_tile.log(filename='B_tile')
 
             A_smem.copy_from(A_tile)
             B_smem.copy_from(B_tile)
 
             barrier()
 
-            #for k in range(BK):
-            #    var A_subtile = A_smem.tile[TM, 1](subtile_row, k)
-            #    var B_subtile = B_smem.tile[1, BN](k, 0)
-            #    var B_element = B_subtile[0, subtile_col]
+            if participates_in_compute:
+                for k in range(BK):
+                    var A_subtile = A_smem.tile[TM, 1](subtile_row, k)
+                    var B_subtile = B_smem.tile[1, BN](k, 0)
+                    var B_element = B_subtile[0, subtile_col]
 
-            #    for t in range(TM):
-            #        product = A_subtile[t, 0] * B_element
-            #        dst_reg[t] += product
+                    for t in range(TM):
+                        product = A_subtile[t, 0] * B_element
+                        dst_reg[t] += product
 
             barrier()
 
@@ -90,9 +94,9 @@ def tiled_register_matmul[
 fn main() raises:
     clear_log_files()
 
-    alias M = 4096
-    alias K = 6144
-    alias N = 2048
+    alias M = 480
+    alias K = 560
+    alias N = 240
     A = example_logged_tensor[M, K]("A")
     A.print()
     B = example_logged_tensor[K, N]("B")
@@ -110,16 +114,17 @@ fn main() raises:
     comptime NUM_THREADS = max(COMPUTE_THREADS, COPY_THREADS)
     comptime version = 'whatever'
 
-    #grid_dim = (ceildiv(N, BN), ceildiv(M, BM))
-    #block_dim = NUM_THREADS
-
-    block_idx.set_dim3(1, 2)
-    thread_idx.set_dim3(3)
-
-    tiled_register_matmul[
-        DType.float32,
-        Layout.row_major(M, K),
-        Layout.row_major(K, N),
-        Layout.row_major(M, N),
-        BM, BK, BN, TM, COMPUTE_THREADS, NUM_THREADS, version,
-    ](A, B, C)
+    grid_dim = (ceildiv(N, BN), ceildiv(M, BM))
+    block_dim = NUM_THREADS
+    for block_id_x in range(grid_dim[0]):
+        for block_id_y in range(grid_dim[1]):
+            for thread_id in range(NUM_THREADS):
+                block_idx.set_dim3(block_id_x, block_id_y)
+                thread_idx.set_dim3(thread_id)
+                tiled_register_matmul[
+                    DType.float32,
+                    Layout.row_major(M, K),
+                    Layout.row_major(K, N),
+                    Layout.row_major(M, N),
+                    BM, BK, BN, TM, COMPUTE_THREADS, NUM_THREADS, version,
+                ](A, B, C)
