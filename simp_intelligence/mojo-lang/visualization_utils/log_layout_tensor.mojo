@@ -97,6 +97,14 @@ struct LoggedTensor[
                 print("...".rjust(5), end="")
         print()
 
+    fn log(read self, filename: StaticString = "tmp") raises:
+        var x = self.origin_x
+        var y = self.origin_y
+        var n_rows = self.impl.shape[0]()
+        var n_cols = self.impl.shape[1]()
+        with open(filename + ".log", "a") as fh:
+            fh.write('{}x{}@({},{})\n'.format(n_rows, n_cols, x, y))
+
     fn dim[idx: Int](self) -> Int:
         return self.impl.dim[idx]()
 

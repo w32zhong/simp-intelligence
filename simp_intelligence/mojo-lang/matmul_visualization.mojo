@@ -64,6 +64,8 @@ def tiled_register_matmul[
             var A_tile = A.tile[BM, BK](block_idx.y, block)
             var B_tile = B.tile[BK, BN](block, block_idx.x)
 
+            A_tile.log()
+
             A_smem.copy_from(A_tile)
             B_smem.copy_from(B_tile)
 
