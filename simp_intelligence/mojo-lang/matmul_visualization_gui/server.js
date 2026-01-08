@@ -8,14 +8,16 @@ const LOG_FILES = {
     block: path.join(__dirname, '../block_tile.log'),
     thread: path.join(__dirname, '../thread_tile.log'),
     A: path.join(__dirname, '../A_tile.log'),
-    B: path.join(__dirname, '../B_tile.log')
+    B: path.join(__dirname, '../B_tile.log'),
+    A_sub: path.join(__dirname, '../A_subtile.log'),
+    B_sub: path.join(__dirname, '../B_subtile.log')
 };
 const MOJO_FILE = path.join(__dirname, '../matmul_visualization.mojo');
 
 let cachedData = null;
 
 async function getMatrixDimensions() {
-    let dims = { M: 0, K: 0, N: 0, BM: 4, BN: 4, BK: 4 }; // Defaults
+    let dims = { M: 0, K: 0, N: 0, BM: 4, BN: 4, BK: 4 };
 
     if (fs.existsSync(MOJO_FILE)) {
         const content = fs.readFileSync(MOJO_FILE, 'utf-8');
@@ -35,7 +37,6 @@ async function getMatrixDimensions() {
         if (kMatch) dims.K = parseInt(kMatch[1], 10);
         if (nMatch) dims.N = parseInt(nMatch[1], 10);
 
-        // helper to resolve value
         const resolve = (match) => {
             if (!match) return 4;
             if (match[1] === 'OPTIMIZED_BLOCK_SIZE') return optSize;
@@ -59,13 +60,15 @@ async function parseLogs() {
     const threadTileMap = {};
     const aTileMap = {};
     const bTileMap = {};
+    const aSubTileMap = {};
+    const bSubTileMap = {};
     
     let maxBlockCol = 0; 
     let maxBlockRow = 0; 
     let maxThreadID = 0;
-    let maxBlockK = 0; 
+    let maxBlockK = 0;
+    let maxInnerK = 0;
 
-    // Helper to process a file
     const processFile = async (filePath, type) => {
         if (!fs.existsSync(filePath)) {
             console.warn(`File not found: ${filePath}`);
@@ -110,6 +113,20 @@ async function parseLogs() {
                     const k = entry['block'];
                     maxBlockK = Math.max(maxBlockK, k);
                     bTileMap[`${k}_${bx}`] = tile;
+                } else if (type === 'A_sub') {
+                    const k = entry['block'];
+                    const innerK = entry['k'];
+                    const tx = entry['thread_id.x'];
+                    maxInnerK = Math.max(maxInnerK, innerK);
+                    // Key: Row(by) _ BlockK(k) _ InnerK(innerK) _ Thread(tx)
+                    aSubTileMap[`${by}_${k}_${innerK}_${tx}`] = tile;
+                } else if (type === 'B_sub') {
+                    const k = entry['block'];
+                    const innerK = entry['k'];
+                    const tx = entry['thread_id.x'];
+                    maxInnerK = Math.max(maxInnerK, innerK);
+                    // Key: BlockK(k) _ Col(bx) _ InnerK(innerK) _ Thread(tx)
+                    bSubTileMap[`${k}_${bx}_${innerK}_${tx}`] = tile;
                 }
 
             } catch (e) {
@@ -122,6 +139,8 @@ async function parseLogs() {
     await processFile(LOG_FILES.thread, 'thread');
     await processFile(LOG_FILES.A, 'A');
     await processFile(LOG_FILES.B, 'B');
+    await processFile(LOG_FILES.A_sub, 'A_sub');
+    await processFile(LOG_FILES.B_sub, 'B_sub');
 
     const dims = await getMatrixDimensions();
     
@@ -129,21 +148,17 @@ async function parseLogs() {
     if (dims.K === 0) dims.K = 560;
     if (dims.N === 0) dims.N = 240;
 
-    // Constrain limits based on parsed dimensions to handle stale logs
-    // Grid dims are ceildiv(N, BN) and ceildiv(M, BM)
     const theoreticalMaxCol = Math.ceil(dims.N / dims.BN) - 1;
     const theoreticalMaxRow = Math.ceil(dims.M / dims.BM) - 1;
     const theoreticalMaxK = Math.ceil(dims.K / dims.BK) - 1;
+    const theoreticalMaxInnerK = dims.BK - 1;
 
-    // Use minimum of log-observed and theoretical to be safe, 
-    // OR just use theoretical to force consistency with current code version?
-    // Using theoretical is safer for "input B goes off border" issue.
-    
     const finalMaxCol = theoreticalMaxCol; 
     const finalMaxRow = theoreticalMaxRow;
     const finalMaxK = theoreticalMaxK;
+    const finalMaxInnerK = theoreticalMaxInnerK;
 
-    console.log(`Limits: Logs(Col:${maxBlockCol}, Row:${maxBlockRow}, K:${maxBlockK}) -> Enforced(Col:${finalMaxCol}, Row:${finalMaxRow}, K:${finalMaxK})`);
+    console.log(`Limits Enforced: Col:${finalMaxCol}, Row:${finalMaxRow}, K:${finalMaxK}, InnerK:${finalMaxInnerK}`);
 
     return {
         dims: dims, 
@@ -151,18 +166,20 @@ async function parseLogs() {
             block: blockTileMap,
             thread: threadTileMap,
             A: aTileMap,
-            B: bTileMap
+            B: bTileMap,
+            A_sub: aSubTileMap,
+            B_sub: bSubTileMap
         },
         limits: {
             max_block_col: finalMaxCol,
             max_block_row: finalMaxRow,
-            max_thread_id: maxThreadID, // Thread ID usually static
-            max_block_k: finalMaxK
+            max_thread_id: maxThreadID,
+            max_block_k: finalMaxK,
+            max_inner_k: finalMaxInnerK
         }
     };
 }
 
-// Parse logs immediately on start
 parseLogs().then(data => {
     cachedData = data;
 });

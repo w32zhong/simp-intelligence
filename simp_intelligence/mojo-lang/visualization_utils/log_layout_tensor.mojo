@@ -185,6 +185,8 @@ struct LoggedTensor[
         ](tiled_view, new_name, new_origin_x, new_origin_y)
 
     fn copy_from(mut self: Self._AsMut, other: LoggedTensor):
+        self.origin_x = other.origin_x
+        self.origin_y = other.origin_y
         return self.impl.copy_from(other.impl)
 
     fn __getitem__(self, x: Int, y: Int) -> Self.ImplType.element_type:

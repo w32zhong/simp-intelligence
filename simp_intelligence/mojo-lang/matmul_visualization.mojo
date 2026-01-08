@@ -73,15 +73,19 @@ def tiled_register_matmul[
 
             barrier()
 
-            #if participates_in_compute:
-            #    for k in range(BK):
-            #        var A_subtile = A_smem.tile[TM, 1](subtile_row, k)
-            #        var B_subtile = B_smem.tile[1, BN](k, 0)
-            #        var B_element = B_subtile[0, subtile_col]
+            if participates_in_compute:
+                for k in range(BK):
+                    var A_subtile = A_smem.tile[TM, 1](subtile_row, k)
+                    var B_subtile = B_smem.tile[1, BN](k, 0)
 
-            #        for t in range(TM):
-            #            product = A_subtile[t, 0] * B_element
-            #            dst_reg[t] += product
+                    A_subtile.log(filename='A_subtile', block=block, k=k)
+                    B_subtile.log(filename='B_subtile', block=block, k=k)
+
+                    var B_element = B_subtile[0, subtile_col]
+
+                    for t in range(TM):
+                        product = A_subtile[t, 0] * B_element
+                        #dst_reg[t] += product
 
             barrier()
 

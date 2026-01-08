@@ -23,16 +23,20 @@
                     <input type="range" id="blockRow" min="0" value="0">
                 </div>
                 <div class="control-group">
-                    <label for="blockK">K: <span id="valBlockK">0</span></label>
+                    <label for="blockK">Block K: <span id="valBlockK">0</span></label>
                     <input type="range" id="blockK" min="0" value="0">
                 </div>
                 <div class="control-group">
-                    <label for="threadID">thread_id: <span id="valThreadID">0</span></label>
+                    <label for="innerK">Inner K: <span id="valInnerK">0</span></label>
+                    <input type="range" id="innerK" min="0" value="0">
+                </div>
+                <div class="control-group">
+                    <label for="threadID">Thread ID: <span id="valThreadID">0</span></label>
                     <input type="range" id="threadID" min="0" value="0">
                 </div>
                 <div class="control-group">
                     <label for="scale">Zoom Scale: <span id="valScale">5</span></label>
-                    <input type="range" id="scale" min="1" max="10" value="5">
+                    <input type="range" id="scale" min="1" max="10" value="5" step="0.1">
                 </div>
             </div>
 
@@ -65,6 +69,10 @@
                 <div class="legend-item">
                     <div class="color-box input-color"></div>
                     <span>Input Tile (A & B)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="color-box subtile-color"></div>
+                    <span>Sub-Tile (Inner K)</span>
                 </div>
             </div>
         </div>

@@ -18,15 +18,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     const { dims, tiles, limits } = VI_DATA;
-    // dims: { M, K, N }
-    // A: M x K
-    // B: K x N
-    // C: M x N
-    
-    // Canvas dimensions (Rows x Cols)
-    // Canvas A: M rows x K cols
-    // Canvas B: K rows x N cols
-    // Canvas C: M rows x N cols
     
     const canvasA = document.getElementById('canvasA');
     const canvasB = document.getElementById('canvasB');
@@ -36,15 +27,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     const ctxB = canvasB.getContext('2d', { alpha: false });
     const ctxC = canvasC.getContext('2d', { alpha: false });
 
-    const sliderBlockCol = document.getElementById('blockCol'); // C col index (block_id.x)
-    const sliderBlockRow = document.getElementById('blockRow'); // C row index (block_id.y)
-    const sliderBlockK = document.getElementById('blockK');     // K index
+    const sliderBlockCol = document.getElementById('blockCol'); 
+    const sliderBlockRow = document.getElementById('blockRow'); 
+    const sliderBlockK = document.getElementById('blockK');     
+    const sliderInnerK = document.getElementById('innerK'); // New
     const sliderThreadID = document.getElementById('threadID');
     const sliderScale = document.getElementById('scale');
     
     const valBlockCol = document.getElementById('valBlockCol');
     const valBlockRow = document.getElementById('valBlockRow');
     const valBlockK = document.getElementById('valBlockK');
+    const valInnerK = document.getElementById('valInnerK'); // New
     const valThreadID = document.getElementById('valThreadID');
     const valScale = document.getElementById('valScale');
 
@@ -52,9 +45,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     sliderBlockCol.max = limits.max_block_col;
     sliderBlockRow.max = limits.max_block_row;
     sliderBlockK.max = limits.max_block_k;
+    sliderInnerK.max = limits.max_inner_k; // New
     sliderThreadID.max = limits.max_thread_id;
     
-    let currentScale = parseInt(sliderScale.value);
+    let currentScale = parseFloat(sliderScale.value);
 
     let cacheA = null;
     let cacheB = null;
@@ -111,12 +105,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         const px = tile.x * currentScale;
         const py = tile.y * currentScale;
         
-        // Clamp dimensions to canvas bounds
-        // The tile w/h are in logical units, scale them.
         let pw = tile.w * currentScale;
         let ph = tile.h * currentScale;
         
-        // Canvas dims are also scaled
         const maxW = ctx.canvas.width - px;
         const maxH = ctx.canvas.height - py;
         
@@ -128,20 +119,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         ctx.fillStyle = color;
         ctx.fillRect(px, py, pw, ph);
 
-        ctx.strokeStyle = color.replace('0.5', '1.0').replace('0.7', '1.0');
+        ctx.strokeStyle = color.replace('0.5', '1.0').replace('0.6', '1.0').replace('0.7', '1.0');
         ctx.lineWidth = 2;
         ctx.strokeRect(px, py, pw, ph);
     }
 
     function update() {
-        const bx = parseInt(sliderBlockCol.value); // C Col
-        const by = parseInt(sliderBlockRow.value); // C Row
-        const bk = parseInt(sliderBlockK.value);   // K
+        const bx = parseInt(sliderBlockCol.value); 
+        const by = parseInt(sliderBlockRow.value); 
+        const bk = parseInt(sliderBlockK.value);   
+        const ik = parseInt(sliderInnerK.value);   // New
         const tx = parseInt(sliderThreadID.value);
         
         valBlockCol.textContent = bx;
         valBlockRow.textContent = by;
         valBlockK.textContent = bk;
+        valInnerK.textContent = ik; // New
         valThreadID.textContent = tx;
         
         // Draw Bases
@@ -151,24 +144,34 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // Highlights
         
-        // A: Key "row_k" -> "by_bk"
-        // A's block is determined by C-row (by) and K-loop (bk)
+        // A Tile (Outer Loop)
         const aKey = `${by}_${bk}`;
         const aTile = tiles.A[aKey];
         if (aTile) highlightTile(ctxA, aTile, 'rgba(40, 167, 69, 0.5)'); // Green
 
-        // B: Key "k_col" -> "bk_bx"
-        // B's block is determined by K-loop (bk) and C-col (bx)
+        // B Tile (Outer Loop)
         const bKey = `${bk}_${bx}`;
         const bTile = tiles.B[bKey];
         if (bTile) highlightTile(ctxB, bTile, 'rgba(40, 167, 69, 0.5)'); // Green
 
-        // C Block: "bx_by"
+        // A SubTile (Inner Loop)
+        // Key: Row(by) _ BlockK(bk) _ InnerK(ik) _ Thread(tx)
+        const aSubKey = `${by}_${bk}_${ik}_${tx}`;
+        const aSubTile = tiles.A_sub[aSubKey];
+        if (aSubTile) highlightTile(ctxA, aSubTile, 'rgba(220, 53, 69, 0.6)'); // Red
+
+        // B SubTile (Inner Loop)
+        // Key: BlockK(bk) _ Col(bx) _ InnerK(ik) _ Thread(tx)
+        const bSubKey = `${bk}_${bx}_${ik}_${tx}`;
+        const bSubTile = tiles.B_sub[bSubKey];
+        if (bSubTile) highlightTile(ctxB, bSubTile, 'rgba(220, 53, 69, 0.6)'); // Red
+
+        // C Block
         const cBlockKey = `${bx}_${by}`;
         const cBlockTile = tiles.block[cBlockKey];
         if (cBlockTile) highlightTile(ctxC, cBlockTile, 'rgba(0, 123, 255, 0.5)'); // Blue
 
-        // C Thread: "bx_by_tx"
+        // C Thread
         const cThreadKey = `${bx}_${by}_${tx}`;
         const cThreadTile = tiles.thread[cThreadKey];
         if (cThreadTile) highlightTile(ctxC, cThreadTile, 'rgba(255, 193, 7, 0.7)'); // Yellow
@@ -177,10 +180,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     sliderBlockCol.addEventListener('input', update);
     sliderBlockRow.addEventListener('input', update);
     sliderBlockK.addEventListener('input', update);
+    sliderInnerK.addEventListener('input', update); // New
     sliderThreadID.addEventListener('input', update);
     
     sliderScale.addEventListener('input', (e) => {
-        currentScale = parseInt(e.target.value);
+        currentScale = parseFloat(e.target.value);
         valScale.textContent = currentScale;
         resizeCanvases();
         update();
