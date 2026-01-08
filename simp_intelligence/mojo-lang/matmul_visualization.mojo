@@ -1,6 +1,7 @@
 from layout import Layout
 from visualization_utils import LoggedTensor as LayoutTensor
-from visualization_utils import block_idx, thread_idx, barrier, example_logged_tensor
+from visualization_utils import block_idx, thread_idx, barrier
+from visualization_utils import example_logged_tensor, clear_log_files
 
 from math import ceildiv
 
@@ -87,6 +88,8 @@ def tiled_register_matmul[
 
 
 fn main() raises:
+    clear_log_files()
+
     alias M = 4096
     alias K = 6144
     alias N = 2048
