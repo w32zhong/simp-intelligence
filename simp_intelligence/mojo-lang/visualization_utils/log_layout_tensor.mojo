@@ -193,10 +193,13 @@ struct LoggedTensor[
         return self.impl[x, y]
 
     fn __getitem__(self, x: Int) -> Self.ImplType.element_type:
-        return self.impl[x, 0]
+        return self.impl[x]
 
     fn __setitem__(self, x: Int, val: Self.ImplType.element_type) where Self.mut:
-        self.impl[x, 0] = val
+        self.impl[x] = val
+
+    fn __setitem__(self, x: Int, y: Int, val: Self.ImplType.element_type) where Self.mut:
+        self.impl[x, y] = val
 
 
 fn example_logged_tensor[

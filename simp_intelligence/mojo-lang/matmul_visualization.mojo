@@ -43,7 +43,7 @@ def tiled_register_matmul[
 
         var dst_reg = LayoutTensor[
             dtype,
-            Layout.row_major(TM, 1),
+            Layout.row_major(TM),
             MutAnyOrigin,
             address_space = AddressSpace.LOCAL,
         ].stack_allocation()
