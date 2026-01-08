@@ -49,6 +49,8 @@ def tiled_register_matmul[
 
         var dst_subtile = C.tile[BM, BN](block_idx.y, block_idx.x)
                            .tile[TM, 1](subtile_row, subtile_col)
+
+        C.tile[BM, BN](block_idx.y, block_idx.x).print()
         dst_subtile.print()
 
         dst_reg.copy_from(dst_subtile)
@@ -90,21 +92,23 @@ fn main() raises:
     A.print()
     B = example_logged_tensor[K, N]("B")
     B.print()
-    #test_B_tile = B.tile[3, 4](1, 1)
-    #test_B_tile.print()
     C = example_logged_tensor[M, N]("C")
+    C.print()
 
-    comptime OPTIMIZED_BLOCK_SIZE = 16
+    comptime OPTIMIZED_BLOCK_SIZE = 4
     comptime BM = OPTIMIZED_BLOCK_SIZE
     comptime BN = OPTIMIZED_BLOCK_SIZE
     comptime BK = OPTIMIZED_BLOCK_SIZE
-    comptime TM = 4
+    comptime TM = 2
     comptime COMPUTE_THREADS = (BM * BN) // TM
     comptime COPY_THREADS = max(BM * BK, BK * BN)
     comptime NUM_THREADS = max(COMPUTE_THREADS, COPY_THREADS)
     comptime version = 'whatever'
 
-    block_idx.set_dim3(2, 1)
+    #grid_dim = (ceildiv(N, BN), ceildiv(M, BM))
+    #block_dim = NUM_THREADS
+
+    block_idx.set_dim3(1, 2)
     thread_idx.set_dim3(3)
 
     tiled_register_matmul[

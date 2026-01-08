@@ -65,8 +65,8 @@ struct LoggedTensor[
         self.origin_x = origin_x
         self.origin_y = origin_y
 
-    fn print(read self, max_rows: Int = 12, max_cols: Int = 8) raises:
-        print("LoggedTensor: name={} layout={} coordinates=({}, {})".format(
+    fn print(read self, max_rows: Int = 12, max_cols: Int = 8, grid: Int = 4) raises:
+        print("name={} layout={} coordinates=({}, {})".format(
             self.name, String(self.impl.runtime_layout),
             self.origin_x, self.origin_y
         ), end=":\n")
@@ -74,8 +74,14 @@ struct LoggedTensor[
         var n_cols = self.impl.shape[1]()
         var last_row: Int = 0
         for row in range(min(n_rows, max_rows)):
+            if row % grid == 0:
+                print("*", end="")
+                for _ in range(min(n_cols, max_cols)):
+                    print("-----".rjust(5), end="")
+                print()
             var last_col: Int = 0
             for col in range(min(n_cols, max_cols)):
+                if col % grid == 0: print("|", end="")
                 print(
                     String(self.impl[row, col]).rjust(5),
                     end=""
