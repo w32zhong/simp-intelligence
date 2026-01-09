@@ -10,7 +10,7 @@ const LOG_FILES = {
     A: path.join(__dirname, '../A_tile.log'),
     B: path.join(__dirname, '../B_tile.log'),
     A_sub: path.join(__dirname, '../A_subtile.log'),
-    B_sub: path.join(__dirname, '../B_element.log')
+    B_sub: path.join(__dirname, '../B_subtile.log')
 };
 const MOJO_FILE = path.join(__dirname, '../matmul_visualization.mojo');
 
@@ -124,18 +124,8 @@ async function parseLogs() {
                 } else if (type === 'B_sub') {
                     const k = entry['block'];
                     const innerK = entry['k'];
-                    const col = entry['col'];
                     const tx = entry['thread_id.x'];
                     maxInnerK = Math.max(maxInnerK, innerK);
-                    
-                    // Override tile for single element
-                    tile = {
-                        x: entry['y'] + col,
-                        y: entry['x'] + innerK,
-                        w: 1,
-                        h: 1
-                    };
-                    
                     // Key: BlockK(k) _ Col(bx) _ InnerK(innerK) _ Thread(tx)
                     bSubTileMap[`${k}_${bx}_${innerK}_${tx}`] = tile;
                 }

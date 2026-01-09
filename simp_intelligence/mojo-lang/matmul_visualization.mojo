@@ -60,13 +60,13 @@ def block_tiled_matrix_multiplication[
 
         var A_reg = LayoutTensor[
             dtype,
-            Layout(TM),
+            Layout.row_major(TM, 1),
             MutAnyOrigin,
             address_space = AddressSpace.LOCAL,
         ].stack_allocation()
         var B_reg = LayoutTensor[
             dtype,
-            Layout(TN),
+            Layout.row_major(1, TN),
             MutAnyOrigin,
             address_space = AddressSpace.LOCAL,
         ].stack_allocation()
