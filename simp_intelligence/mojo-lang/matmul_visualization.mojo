@@ -76,12 +76,10 @@ def tiled_register_matmul[
             if participates_in_compute:
                 for k in range(BK):
                     var A_subtile = A_smem.tile[TM, 1](subtile_row, k)
-                    var B_subtile = B_smem.tile[1, BN](k, 0)
+                    var B_element = B_smem[k, subtile_col]
 
                     A_subtile.log(filename='A_subtile', block=block, k=k)
-                    B_subtile.log(filename='B_subtile', block=block, k=k)
-
-                    var B_element = B_subtile[0, subtile_col]
+                    B_smem.log(filename='B_element', block=block, k=k, col=subtile_col)
 
                     for t in range(TM):
                         product = A_subtile[t, 0] * B_element
