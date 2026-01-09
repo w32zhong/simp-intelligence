@@ -171,7 +171,6 @@ fn tiled_register_matmul[
                            .tile[TM, 1](subtile_row, subtile_col)
 
         dst_reg.copy_from(dst_subtile)
-        barrier()
 
         for block in range(ceildiv(K, BK)):
             comptime A_tile_layout = Layout.row_major(BM, BK)
@@ -182,7 +181,16 @@ fn tiled_register_matmul[
 
             copy_dram_to_sram_async[thread_layout=A_tile_layout](A_smem, A_tile)
             copy_dram_to_sram_async[thread_layout=B_tile_layout](B_smem, B_tile)
+
+            # We need async_copy_wait_all to wait THIS thread_id finished its dram-to-sram
+            # copying. It does not tell anything about the neighbor threads in this block.
+            # Without async_copy_wait_all, because copy_dram_to_sram_async is non-blocking,
+            # we will likely have all neighbor threads pass the barrier and the copy is not
+            # done yet!
             async_copy_wait_all()
+
+            # Here needs a barrier to ensures all threads have finished their chunk
+            # of data to shared memory before any thread starts reading from it (RAW).
             barrier()
 
             if participates_in_compute:
@@ -193,6 +201,8 @@ fn tiled_register_matmul[
                         product = A_subtile[t, 0] * B_element
                         dst_reg[t] += product
 
+            # This barrier() ensures all threads have read shared memory before the
+            # next-iteraion overwriting to shared memory (WAR).
             barrier()
 
         if participates_in_compute:
