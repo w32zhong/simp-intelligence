@@ -6,10 +6,9 @@ from visualization_utils import example_logged_tensor, clear_log_files
 from math import ceildiv
 
 
-def tiled_register_matmul[
+def block_tiled_matrix_multiplication[
         dtype: DType, A_layout: Layout, B_layout: Layout, C_layout: Layout,
-        BM: Int, BK: Int, BN: Int, TM: Int, COMPUTE_THREADS: Int,
-        NUM_THREADS: Int, version: StaticString,
+        BM: Int, BK: Int, BN: Int, TM: Int, TN: Int, COMPUTE_THREADS: Int
     ](
         A: LayoutTensor[dtype, A_layout, MutAnyOrigin],
         B: LayoutTensor[dtype, B_layout, MutAnyOrigin],
@@ -19,11 +18,14 @@ def tiled_register_matmul[
         var K = B.dim[0]()
         var N = B.dim[1]()
 
-        var subtile_row = thread_idx.x // BN
-        var subtile_col = thread_idx.x % BN
+        var subtile_row = Int(thread_idx.x // Int(BN // TN))
+        var subtile_col = Int(thread_idx.x % Int(BN // TN))
+
         var max_subtile_rows = BM // TM
+        var max_subtile_cols = BN // TN
         var participates_in_compute = (
             subtile_row < max_subtile_rows and
+            subtile_col < max_subtile_cols and
             thread_idx.x < COMPUTE_THREADS
         )
 
@@ -43,47 +45,57 @@ def tiled_register_matmul[
 
         var dst_reg = LayoutTensor[
             dtype,
-            Layout.row_major(TM),
+            Layout.row_major(TM, TN),
             MutAnyOrigin,
             address_space = AddressSpace.LOCAL,
         ].stack_allocation()
 
         var dst_subtile = C.tile[BM, BN](block_idx.y, block_idx.x)
-                           .tile[TM, 1](subtile_row, subtile_col)
+                           .tile[TM, TN](subtile_row, subtile_col)
+
+        dst_reg.copy_from(dst_subtile)
 
         C.tile[BM, BN](block_idx.y, block_idx.x).log(filename='block_tile')
         dst_subtile.log(filename='thread_tile')
 
-        dst_reg.copy_from(dst_subtile)
-
-        barrier()
+        var A_reg = LayoutTensor[
+            dtype,
+            Layout(TM),
+            MutAnyOrigin,
+            address_space = AddressSpace.LOCAL,
+        ].stack_allocation()
+        var B_reg = LayoutTensor[
+            dtype,
+            Layout(TN),
+            MutAnyOrigin,
+            address_space = AddressSpace.LOCAL,
+        ].stack_allocation()
 
         for block in range(ceildiv(K, BK)):
-            comptime A_tile_layout = Layout.row_major(BM, BK)
-            comptime B_tile_layout = Layout.row_major(BK, BN)
+            comptime A_tile_layout = Layout.row_major(COMPUTE_THREADS // BK, BK)
+            comptime B_tile_layout = Layout.row_major(BK, COMPUTE_THREADS // BK)
 
             var A_tile = A.tile[BM, BK](block_idx.y, block)
             var B_tile = B.tile[BK, BN](block, block_idx.x)
-
+            
             A_tile.log(filename='A_tile', block=block)
             B_tile.log(filename='B_tile', block=block)
 
             A_smem.copy_from(A_tile)
             B_smem.copy_from(B_tile)
-
             barrier()
 
             if participates_in_compute:
                 for k in range(BK):
                     var A_subtile = A_smem.tile[TM, 1](subtile_row, k)
-                    var B_element = B_smem[k, subtile_col]
+                    var B_subtile = B_smem.tile[1, TN](k, subtile_col)
 
-                    A_subtile.log(filename='A_subtile', block=block, k=k)
-                    B_smem.log(filename='B_element', block=block, k=k, col=subtile_col)
+                    A_reg.copy_from(A_subtile)
+                    B_reg.copy_from(B_subtile)
 
-                    for t in range(TM):
-                        product = A_subtile[t, 0] * B_element
-                        dst_reg[t] += product
+                    A_reg.log(filename='A_subtile', block=block, k=k)
+                    B_reg.log(filename='B_subtile', block=block, k=k)
+                    #outer_product_acc(dst_reg, A_reg, B_reg)
 
             barrier()
 
@@ -109,22 +121,22 @@ fn main() raises:
     comptime BN = OPTIMIZED_BLOCK_SIZE
     comptime BK = OPTIMIZED_BLOCK_SIZE
     comptime TM = 2
-    comptime COMPUTE_THREADS = (BM * BN) // TM
+    comptime TN = 2
+    comptime COMPUTE_THREADS = (BM * BN) // (TM * TN)
     comptime COPY_THREADS = max(BM * BK, BK * BN)
     comptime NUM_THREADS = max(COMPUTE_THREADS, COPY_THREADS)
-    comptime version = 'whatever'
 
     grid_dim = (ceildiv(N, BN), ceildiv(M, BM))
     block_dim = NUM_THREADS
     for block_id_x in range(grid_dim[0]):
         for block_id_y in range(grid_dim[1]):
-            for thread_id in range(NUM_THREADS):
+            for thread_id in range(block_dim):
                 block_idx.set_dim3(block_id_x, block_id_y)
                 thread_idx.set_dim3(thread_id)
-                tiled_register_matmul[
+                block_tiled_matrix_multiplication[
                     DType.float32,
                     Layout.row_major(M, K),
                     Layout.row_major(K, N),
                     Layout.row_major(M, N),
-                    BM, BK, BN, TM, COMPUTE_THREADS, NUM_THREADS, version,
+                    BM, BK, BN, TM, TN, COMPUTE_THREADS
                 ](A, B, C)
