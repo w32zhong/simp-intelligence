@@ -32,7 +32,7 @@ struct LoggedTensor[
 ]:
     alias ImplType = LayoutTensor[
         dtype, layout, origin,
-        address_space=address_space,
+        address_space=AddressSpace.GENERIC, # fixed b/c we run on CPU
         layout_int_type=layout_int_type,
         linear_idx_type=linear_idx_type,
         masked=masked,
@@ -143,7 +143,6 @@ struct LoggedTensor[
             dtype,
             layout,
             MutAnyOrigin,
-            address_space=address_space,
             layout_int_type=layout_int_type,
             linear_idx_type=linear_idx_type,
             masked=masked

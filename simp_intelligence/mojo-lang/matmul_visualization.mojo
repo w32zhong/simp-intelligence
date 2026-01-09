@@ -85,7 +85,7 @@ def tiled_register_matmul[
 
                     for t in range(TM):
                         product = A_subtile[t, 0] * B_element
-                        #dst_reg[t] += product
+                        dst_reg[t] += product
 
             barrier()
 
