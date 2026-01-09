@@ -179,6 +179,13 @@ fn tiled_register_matmul[
             var A_tile = A.tile[BM, BK](block_idx.y, block)
             var B_tile = B.tile[BK, BN](block, block_idx.x)
 
+            # this copy_dram_to_sram_async requires a full grid of thread workers, i.e.,
+            # COPY_THREADS = max(BM * BK, BK * BN).
+            # Because inside copy_dram_to_sram_async, the logic looks roughly like this:
+            # fn copy_dram_to_sram_async():
+            #     my_id = thread_idx.x
+            #     if my_id < total_elements in destination:
+            #         copy
             copy_dram_to_sram_async[thread_layout=A_tile_layout](A_smem, A_tile)
             copy_dram_to_sram_async[thread_layout=B_tile_layout](B_smem, B_tile)
 
