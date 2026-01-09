@@ -96,9 +96,9 @@ def tiled_register_matmul[
 fn main() raises:
     clear_log_files()
 
-    alias M = 48
-    alias K = 56
-    alias N = 24
+    alias M = 28
+    alias K = 48
+    alias N = 12
     A = example_logged_tensor[M, K]("A")
     A.print()
     B = example_logged_tensor[K, N]("B")
