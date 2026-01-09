@@ -16,6 +16,7 @@ from layout.layout_tensor import (
     LayoutTensor,
     copy_dram_to_sram_async,
 )
+from layout.math import outer_product_acc
 from math import ceildiv
 
 
@@ -216,6 +217,94 @@ fn tiled_register_matmul[
             dst_subtile.copy_from(dst_reg)
 
 
+fn block_tiled_matrix_multiplication[
+        dtype: DType, A_layout: Layout, B_layout: Layout, C_layout: Layout,
+        BM: Int, BK: Int, BN: Int, TM: Int, TN: Int, COMPUTE_THREADS: Int
+    ](
+        A: LayoutTensor[dtype, A_layout, MutAnyOrigin],
+        B: LayoutTensor[dtype, B_layout, MutAnyOrigin],
+        C: LayoutTensor[dtype, C_layout, MutAnyOrigin],
+    ):
+        var M = A.dim[0]()
+        var K = B.dim[0]()
+        var N = B.dim[1]()
+
+        var subtile_row = Int(thread_idx.x // UInt(BN // TN))
+        var subtile_col = Int(thread_idx.x % UInt(BN // TN))
+
+        var max_subtile_rows = BM // TM
+        var max_subtile_cols = BN // TN
+        var participates_in_compute = (
+            subtile_row < max_subtile_rows and
+            subtile_col < max_subtile_cols and
+            thread_idx.x < COMPUTE_THREADS
+        )
+
+        var A_smem = LayoutTensor[
+            dtype,
+            Layout.row_major(BM, BK),
+            MutAnyOrigin,
+            address_space = AddressSpace.SHARED,
+        ].stack_allocation()
+
+        var B_smem = LayoutTensor[
+            dtype,
+            Layout.row_major(BK, BN),
+            MutAnyOrigin,
+            address_space = AddressSpace.SHARED,
+        ].stack_allocation()
+
+        var dst_reg = LayoutTensor[
+            dtype,
+            Layout.row_major(TM, TN),
+            MutAnyOrigin,
+            address_space = AddressSpace.LOCAL,
+        ].stack_allocation()
+
+        var dst_subtile = C.tile[BM, BN](block_idx.y, block_idx.x)
+                           .tile[TM, TN](subtile_row, subtile_col)
+
+        dst_reg.copy_from(dst_subtile)
+
+        var A_reg = LayoutTensor[
+            dtype,
+            Layout(TM),
+            MutAnyOrigin,
+            address_space = AddressSpace.LOCAL,
+        ].stack_allocation()
+        var B_reg = LayoutTensor[
+            dtype,
+            Layout(TN),
+            MutAnyOrigin,
+            address_space = AddressSpace.LOCAL,
+        ].stack_allocation()
+
+        for block in range(ceildiv(K, BK)):
+            comptime A_tile_layout = Layout.row_major(COMPUTE_THREADS // BK, BK)
+            comptime B_tile_layout = Layout.row_major(BK, COMPUTE_THREADS // BK)
+
+            var A_tile = A.tile[BM, BK](block_idx.y, block)
+            var B_tile = B.tile[BK, BN](block, block_idx.x)
+
+            copy_dram_to_sram_async[thread_layout=A_tile_layout](A_smem, A_tile)
+            copy_dram_to_sram_async[thread_layout=B_tile_layout](B_smem, B_tile)
+            async_copy_wait_all()
+            barrier()
+
+            if participates_in_compute:
+                for k in range(BK):
+                    var A_subtile = A_smem.tile[TM, 1](subtile_row, k)
+                    var B_subtile = B_smem.tile[1, TN](k, subtile_col)
+                    A_reg.copy_from(A_subtile)
+                    B_reg.copy_from(B_subtile)
+                    outer_product_acc(dst_reg, A_reg, B_reg)
+
+            barrier()
+
+        if participates_in_compute:
+            dst_subtile.copy_from(dst_reg)
+
+
 
 @compiler.register("my_matmul")
 struct MyMatMul[algorithm: StaticString]:
@@ -295,6 +384,24 @@ struct MyMatMul[algorithm: StaticString]:
                 tiled_register_matmul[
                     output.dtype, A.layout, B.layout, output.layout,
                     BM, BK, BN, TM, COMPUTE_THREADS
+                ]
+            ](
+                A, B, output,
+                grid_dim=(ceildiv(N, BN), ceildiv(M, BM)),
+                block_dim=NUM_THREADS,
+            )
+
+        elif algorithm == "block_tiling":
+            comptime TM = 4
+            comptime TN = 4
+            comptime COMPUTE_THREADS = (BM * BN) // (TM * TN)
+            comptime COPY_THREADS = max(BM * BK, BK * BN)
+            comptime NUM_THREADS = max(COMPUTE_THREADS, COPY_THREADS)
+
+            device_ctx.enqueue_function[
+                block_tiled_matrix_multiplication[
+                    output.dtype, A.layout, B.layout, output.layout,
+                    BM, BK, BN, TM, TN, COMPUTE_THREADS
                 ]
             ](
                 A, B, output,
