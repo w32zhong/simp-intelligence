@@ -7,30 +7,24 @@ from gpu import (
     WARP_SIZE,
     barrier
 )
-from gpu.memory import async_copy_wait_all
+from gpu.memory import AddressSpace, async_copy_wait_all
 from gpu.host import DeviceBuffer, DeviceContext
 from runtime.asyncrt import DeviceContextPtr
-from tensor_internal import (
-    InputTensor,
-    OutputTensor,
-)
+from tensor import InputTensor, OutputTensor
 from layout.layout_tensor import (
     Layout,
     LayoutTensor,
     copy_dram_to_sram_async,
 )
-from layout.tensor_builder import LayoutTensorBuild as tensor_builder
-from utils import StaticTuple
 from math import ceildiv
 
 
-#@__llvm_metadata(MAX_THREADS_PER_BLOCK_METADATA=StaticTuple[Int32, 1](256))
 fn naive_matmul[
         dtype: DType, A_layout: Layout, B_layout: Layout, C_layout: Layout
     ](
-        A: LayoutTensor[dtype, A_layout, MutableAnyOrigin],
-        B: LayoutTensor[dtype, B_layout, MutableAnyOrigin],
-        C: LayoutTensor[dtype, C_layout, MutableAnyOrigin],
+        A: LayoutTensor[dtype, A_layout, MutAnyOrigin],
+        B: LayoutTensor[dtype, B_layout, MutAnyOrigin],
+        C: LayoutTensor[dtype, C_layout, MutAnyOrigin],
     ):
         M = A.dim[0]()
         K = B.dim[0]()
@@ -50,9 +44,9 @@ fn naive_matmul[
 fn coalescing_matmul[
         dtype: DType, A_layout: Layout, B_layout: Layout, C_layout: Layout
     ](
-        A: LayoutTensor[dtype, A_layout, MutableAnyOrigin],
-        B: LayoutTensor[dtype, B_layout, MutableAnyOrigin],
-        C: LayoutTensor[dtype, C_layout, MutableAnyOrigin],
+        A: LayoutTensor[dtype, A_layout, MutAnyOrigin],
+        B: LayoutTensor[dtype, B_layout, MutAnyOrigin],
+        C: LayoutTensor[dtype, C_layout, MutAnyOrigin],
     ):
         M = A.dim[0]()
         K = B.dim[0]()
@@ -71,30 +65,13 @@ fn coalescing_matmul[
             C[row, col] = dst_reg
 
 
-fn zero_out[dtype: DType, layout: Layout](
-        ctx: DeviceContextPtr,
-        tensor: LayoutTensor[dtype, layout, MutableAnyOrigin]
-    ) raises:
-        bytes = tensor.shape[0]() * tensor.shape[1]()
-        device_ctx = ctx.get_device_context()
-        device_ctx.enqueue_memset(
-            DeviceBuffer[dtype](
-                device_ctx,
-                rebind[UnsafePointer[Scalar[dtype]]](tensor.ptr),
-                bytes,
-                owning=False,
-            ),
-            0, # fill zeros
-        )
-
-
 fn tiled_matmul[
         dtype: DType, A_layout: Layout, B_layout: Layout, C_layout: Layout,
         BM: Int, BK: Int, BN: Int, NUM_THREADS: Int
     ](
-        A: LayoutTensor[dtype, A_layout, MutableAnyOrigin],
-        B: LayoutTensor[dtype, B_layout, MutableAnyOrigin],
-        C: LayoutTensor[dtype, C_layout, MutableAnyOrigin],
+        A: LayoutTensor[dtype, A_layout, MutAnyOrigin],
+        B: LayoutTensor[dtype, B_layout, MutAnyOrigin],
+        C: LayoutTensor[dtype, C_layout, MutAnyOrigin],
     ):
         var M = A.dim[0]()
         var K = B.dim[0]()
@@ -110,8 +87,19 @@ fn tiled_matmul[
         var tile_row = thread_idx.x // BN
         var tile_col = thread_idx.x % BN
 
-        var A_smem = tensor_builder[dtype]().row_major[BM, BK]().shared().alloc()
-        var B_smem = tensor_builder[dtype]().row_major[BK, BN]().shared().alloc()
+        var A_smem = LayoutTensor[
+            dtype,
+            Layout.row_major(BM, BK),
+            MutAnyOrigin,
+            address_space = AddressSpace.SHARED,
+        ].stack_allocation()
+
+        var B_smem = LayoutTensor[
+            dtype,
+            Layout.row_major(BK, BN),
+            MutAnyOrigin,
+            address_space = AddressSpace.SHARED,
+        ].stack_allocation()
 
         var dst_tile = C.tile[BM, BN](block_idx.y, block_idx.x)
         var dst_reg: C.element_type = 0
@@ -138,13 +126,13 @@ fn tiled_matmul[
         dst_tile[tile_row, tile_col] += dst_reg
 
 
-def tiled_register_matmul[
+fn tiled_register_matmul[
         dtype: DType, A_layout: Layout, B_layout: Layout, C_layout: Layout,
         BM: Int, BK: Int, BN: Int, TM: Int, COMPUTE_THREADS: Int
     ](
-        A: LayoutTensor[dtype, A_layout, MutableAnyOrigin],
-        B: LayoutTensor[dtype, B_layout, MutableAnyOrigin],
-        C: LayoutTensor[dtype, C_layout, MutableAnyOrigin],
+        A: LayoutTensor[dtype, A_layout, MutAnyOrigin],
+        B: LayoutTensor[dtype, B_layout, MutAnyOrigin],
+        C: LayoutTensor[dtype, C_layout, MutAnyOrigin],
     ):
         var M = A.dim[0]()
         var K = B.dim[0]()
@@ -183,6 +171,7 @@ def tiled_register_matmul[
                            .tile[TM, 1](subtile_row, subtile_col)
 
         dst_reg.copy_from(dst_subtile)
+        barrier()
 
         for block in range(ceildiv(K, BK)):
             comptime A_tile_layout = Layout.row_major(BM, BK)
@@ -191,13 +180,10 @@ def tiled_register_matmul[
             var A_tile = A.tile[BM, BK](block_idx.y, block)
             var B_tile = B.tile[BK, BN](block, block_idx.x)
 
-            A_tile.log(filename='A_tile', block=block)
-            B_tile.log(filename='B_tile', block=block)
-
             copy_dram_to_sram_async[thread_layout=A_tile_layout](A_smem, A_tile)
             copy_dram_to_sram_async[thread_layout=B_tile_layout](B_smem, B_tile)
-
             async_copy_wait_all()
+            barrier()
 
             if participates_in_compute:
                 for k in range(BK):
@@ -213,6 +199,7 @@ def tiled_register_matmul[
             dst_subtile.copy_from(dst_reg)
 
 
+
 @compiler.register("my_matmul")
 struct MyMatMul[algorithm: StaticString]:
     @staticmethod
@@ -222,19 +209,24 @@ struct MyMatMul[algorithm: StaticString]:
         raw_B: InputTensor[dtype = raw_output.dtype, rank = raw_output.rank],
         ctx: DeviceContextPtr,
     ) raises:
-        #print("algo: " + algorithm)
         device_ctx = ctx.get_device_context()
 
         A = raw_A.to_layout_tensor()
         B = raw_B.to_layout_tensor()
         output = raw_output.to_layout_tensor()
 
-        # although naive and coalescing kernels do not need this,
-        # keep it here in order to make fair kernel comparisions.
-        zero_out[output.dtype, output.layout](ctx, output)
-
         M = A.shape[0]()
         N = B.shape[1]()
+
+        device_ctx.enqueue_memset(
+            DeviceBuffer[output.dtype](
+                device_ctx,
+                output.ptr,
+                (M * N),
+                owning=False,
+            ),
+            0, # fill zeros
+        )
 
         alias OPTIMIZED_BLOCK_SIZE = 16
         alias BM = OPTIMIZED_BLOCK_SIZE
@@ -295,5 +287,3 @@ struct MyMatMul[algorithm: StaticString]:
 
         else:
             raise Error("Unknown algorithm:", algorithm)
-
-        #device_ctx.synchronize()
