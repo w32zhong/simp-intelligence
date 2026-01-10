@@ -21,11 +21,7 @@ def block_tiled_matrix_multiplication[
         var subtile_row = Int(thread_idx.x // Int(BN // TN))
         var subtile_col = Int(thread_idx.x % Int(BN // TN))
 
-        var max_subtile_rows = BM // TM
-        var max_subtile_cols = BN // TN
         var participates_in_compute = (
-            subtile_row < max_subtile_rows and
-            subtile_col < max_subtile_cols and
             thread_idx.x < COMPUTE_THREADS
         )
 

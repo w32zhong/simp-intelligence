@@ -1,4 +1,5 @@
 import compiler
+from utils import StaticTuple
 from gpu import (
     block_dim,
     block_idx,
@@ -20,6 +21,7 @@ from layout.math import outer_product_acc
 from math import ceildiv
 
 
+@__llvm_metadata(MAX_THREADS_PER_BLOCK_METADATA=StaticTuple[Int32, 1](256))
 fn naive_matmul[
         dtype: DType, A_layout: Layout, B_layout: Layout, C_layout: Layout
     ](
@@ -42,6 +44,7 @@ fn naive_matmul[
             C[row, col] = dst_reg
 
 
+@__llvm_metadata(MAX_THREADS_PER_BLOCK_METADATA=StaticTuple[Int32, 1](256))
 fn coalescing_matmul[
         dtype: DType, A_layout: Layout, B_layout: Layout, C_layout: Layout
     ](
@@ -66,6 +69,7 @@ fn coalescing_matmul[
             C[row, col] = dst_reg
 
 
+@__llvm_metadata(MAX_THREADS_PER_BLOCK_METADATA=StaticTuple[Int32, 1](256))
 fn tiled_matmul[
         dtype: DType, A_layout: Layout, B_layout: Layout, C_layout: Layout,
         BM: Int, BK: Int, BN: Int, NUM_THREADS: Int
@@ -127,6 +131,7 @@ fn tiled_matmul[
         dst_tile[tile_row, tile_col] += dst_reg
 
 
+@__llvm_metadata(MAX_THREADS_PER_BLOCK_METADATA=StaticTuple[Int32, 1](256))
 fn tiled_register_matmul[
         dtype: DType, A_layout: Layout, B_layout: Layout, C_layout: Layout,
         BM: Int, BK: Int, BN: Int, TM: Int, COMPUTE_THREADS: Int
@@ -217,6 +222,7 @@ fn tiled_register_matmul[
             dst_subtile.copy_from(dst_reg)
 
 
+@__llvm_metadata(MAX_THREADS_PER_BLOCK_METADATA=StaticTuple[Int32, 1](256))
 fn block_tiled_matrix_multiplication[
         dtype: DType, A_layout: Layout, B_layout: Layout, C_layout: Layout,
         BM: Int, BK: Int, BN: Int, TM: Int, TN: Int, COMPUTE_THREADS: Int
@@ -229,14 +235,10 @@ fn block_tiled_matrix_multiplication[
         var K = B.dim[0]()
         var N = B.dim[1]()
 
-        var subtile_row = Int(thread_idx.x // UInt(BN // TN))
-        var subtile_col = Int(thread_idx.x % UInt(BN // TN))
+        var subtile_row = Int(thread_idx.x // Int(BN // TN))
+        var subtile_col = Int(thread_idx.x % Int(BN // TN))
 
-        var max_subtile_rows = BM // TM
-        var max_subtile_cols = BN // TN
         var participates_in_compute = (
-            subtile_row < max_subtile_rows and
-            subtile_col < max_subtile_cols and
             thread_idx.x < COMPUTE_THREADS
         )
 
@@ -268,13 +270,13 @@ fn block_tiled_matrix_multiplication[
 
         var A_reg = LayoutTensor[
             dtype,
-            Layout(TM),
+            Layout.row_major(TM),
             MutAnyOrigin,
             address_space = AddressSpace.LOCAL,
         ].stack_allocation()
         var B_reg = LayoutTensor[
             dtype,
-            Layout(TN),
+            Layout.row_major(TN),
             MutAnyOrigin,
             address_space = AddressSpace.LOCAL,
         ].stack_allocation()
@@ -297,6 +299,7 @@ fn block_tiled_matrix_multiplication[
                     var B_subtile = B_smem.tile[1, TN](k, subtile_col)
                     A_reg.copy_from(A_subtile)
                     B_reg.copy_from(B_subtile)
+
                     outer_product_acc(dst_reg, A_reg, B_reg)
 
             barrier()
@@ -375,7 +378,7 @@ struct MyMatMul[algorithm: StaticString]:
             )
 
         elif algorithm == "tiled_register":
-            comptime TM = 4
+            comptime TM = 16
             comptime COMPUTE_THREADS = (BM * BN) // TM
             comptime COPY_THREADS = max(BM * BK, BK * BN)
             comptime NUM_THREADS = max(COMPUTE_THREADS, COPY_THREADS)
