@@ -41,3 +41,8 @@ comptime thread_idx = MockGPUIndex['thread_idx']()
 
 fn barrier():
     return
+
+
+fn warp_id() -> UInt:
+    comptime WARP_SIZE = 32
+    return UInt(thread_idx.x % WARP_SIZE)

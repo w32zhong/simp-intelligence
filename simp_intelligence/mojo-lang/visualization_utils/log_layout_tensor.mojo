@@ -29,7 +29,7 @@ struct LoggedTensor[
     layout_int_type: DType = DType.int32,
     linear_idx_type: DType = DType.int32,
     masked: Bool = False,
-]:
+](ImplicitlyCopyable):
     alias ImplType = LayoutTensor[
         dtype, layout, origin,
         address_space=AddressSpace.GENERIC, # fixed b/c we run on CPU
@@ -134,6 +134,14 @@ struct LoggedTensor[
 
     fn dim[idx: Int](self) -> Int:
         return self.impl.dim[idx]()
+
+    fn shape[idx: Int](self) -> Int:
+        return self.impl.dim[idx]()
+
+    fn fill(self, val: Scalar[Self.dtype]) -> Self:
+        for i in range(self.impl.layout.size()):
+            self.impl.ptr.store(self.impl.layout(i), val)
+        return self
 
     @always_inline
     @staticmethod
