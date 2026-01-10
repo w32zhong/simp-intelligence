@@ -1,15 +1,14 @@
 import compiler
-from utils import StaticTuple
 from gpu import (
     block_dim,
     block_idx,
     thread_idx,
-    MAX_THREADS_PER_BLOCK_METADATA,
+    warp_id,
     WARP_SIZE,
     barrier
 )
 from gpu.memory import AddressSpace, async_copy_wait_all
-from gpu.host import DeviceBuffer, DeviceContext
+from gpu.host import DeviceBuffer, DeviceContext, device_attribute
 from runtime.asyncrt import DeviceContextPtr
 from tensor import InputTensor, OutputTensor
 from layout.layout_tensor import (
@@ -17,12 +16,13 @@ from layout.layout_tensor import (
     LayoutTensor,
     copy_dram_to_sram_async,
 )
+from layout.tensor_core import TensorCore
+from utils.index import Index
 from layout.math import outer_product_acc
-from sys.info import simd_width_of
+from sys.info import simd_width_of, has_amd_gpu_accelerator
 from math import ceildiv
 
 
-@__llvm_metadata(MAX_THREADS_PER_BLOCK_METADATA=StaticTuple[Int32, 1](256))
 fn naive_matmul[
         dtype: DType, A_layout: Layout, B_layout: Layout, C_layout: Layout
     ](
@@ -45,7 +45,6 @@ fn naive_matmul[
             C[row, col] = dst_reg
 
 
-@__llvm_metadata(MAX_THREADS_PER_BLOCK_METADATA=StaticTuple[Int32, 1](256))
 fn coalescing_matmul[
         dtype: DType, A_layout: Layout, B_layout: Layout, C_layout: Layout
     ](
@@ -70,7 +69,6 @@ fn coalescing_matmul[
             C[row, col] = dst_reg
 
 
-@__llvm_metadata(MAX_THREADS_PER_BLOCK_METADATA=StaticTuple[Int32, 1](256))
 fn tiled_matmul[
         dtype: DType, A_layout: Layout, B_layout: Layout, C_layout: Layout,
         BM: Int, BK: Int, BN: Int, NUM_THREADS: Int
@@ -132,7 +130,6 @@ fn tiled_matmul[
         dst_tile[tile_row, tile_col] += dst_reg
 
 
-@__llvm_metadata(MAX_THREADS_PER_BLOCK_METADATA=StaticTuple[Int32, 1](256))
 fn tiled_register_matmul[
         dtype: DType, A_layout: Layout, B_layout: Layout, C_layout: Layout,
         BM: Int, BK: Int, BN: Int, TM: Int, COMPUTE_THREADS: Int
@@ -223,7 +220,6 @@ fn tiled_register_matmul[
             dst_subtile.copy_from(dst_reg)
 
 
-@__llvm_metadata(MAX_THREADS_PER_BLOCK_METADATA=StaticTuple[Int32, 1](256))
 fn block_tiled_matrix_multiplication[
         dtype: DType, A_layout: Layout, B_layout: Layout, C_layout: Layout,
         BM: Int, BK: Int, BN: Int, TM: Int, TN: Int, COMPUTE_THREADS: Int
@@ -309,7 +305,6 @@ fn block_tiled_matrix_multiplication[
             dst_subtile.copy_from(dst_reg)
 
 
-@__llvm_metadata(MAX_THREADS_PER_BLOCK_METADATA=StaticTuple[Int32, 1](256))
 fn block_tiled_matrix_multiplication_vectorized[
         dtype: DType, A_layout: Layout, B_layout: Layout, C_layout: Layout,
         BM: Int, BK: Int, BN: Int, TM: Int, TN: Int, COMPUTE_THREADS: Int
@@ -405,6 +400,78 @@ fn block_tiled_matrix_multiplication_vectorized[
             dst_subtile_vec.copy_from(dst_reg_vec)
 
 
+fn tensor_core_matmul_kernel[
+        dtype: DType, A_layout: Layout, B_layout: Layout, C_layout: Layout,
+        BM: Int, BK: Int, BN: Int, WM: Int, WN: Int, MMA_M: Int, MMA_K: Int, MMA_N: Int
+    ](
+        A: LayoutTensor[dtype, A_layout, MutAnyOrigin],
+        B: LayoutTensor[dtype, B_layout, MutAnyOrigin],
+        C: LayoutTensor[dtype, C_layout, MutAnyOrigin],
+    ):
+        var M = A.shape[0]()
+        var K = B.shape[0]()
+        var N = B.shape[1]()
+
+        warp_y = warp_id() // UInt(BN // WN)
+        warp_x = warp_id() % UInt(BN // WN)
+
+        var C_warp_tile = C.tile[BM, BN](block_idx.y, block_idx.x)
+                         .tile[WM, WN](Int(warp_y), Int(warp_x))
+
+        var A_smem_tile = LayoutTensor[
+            dtype,
+            Layout.row_major(BM, BK),
+            MutAnyOrigin,
+            address_space = AddressSpace.SHARED,
+        ].stack_allocation()
+
+        var B_smem_tile = LayoutTensor[
+            dtype,
+            Layout.row_major(BK, BN),
+            MutAnyOrigin,
+            address_space = AddressSpace.SHARED,
+        ].stack_allocation()
+
+        var C_reg_tile = LayoutTensor[
+            dtype,
+            Layout.row_major(WM // MMA_M, (WN * 4) // MMA_N),
+            MutAnyOrigin,
+            address_space = AddressSpace.LOCAL,
+        ].stack_allocation().fill(0)
+
+        mma_op = TensorCore[A.dtype, C.dtype, Index(MMA_M, MMA_N, MMA_K)]()
+
+        for block in range(ceildiv(K, BK)):
+            A_dram_tile = A.tile[BM, BK](Int(block_idx.y), block)
+            B_dram_tile = B.tile[BK, BN](block, Int(block_idx.x))
+
+            A_smem_tile.copy_from(A_dram_tile)
+            B_smem_tile.copy_from(B_dram_tile)
+
+            A_warp_tile = A_smem_tile.tile[WM, BK](Int(warp_y), 0)
+            B_warp_tile = B_smem_tile.tile[BK, WN](0, Int(warp_x))
+
+            for mma_k in range(BK // MMA_K):
+                for mma_m in range(WM // MMA_M):
+                    for mma_n in range(WN // MMA_N):
+                        A_mma_tile = A_warp_tile.tile[MMA_M, MMA_K](mma_m, mma_k)
+                        B_mma_tile = B_warp_tile.tile[MMA_K, MMA_N](mma_k, mma_n)
+
+                        C_result = C_reg_tile.tile[1, 4](mma_m, mma_n)
+                        var result = mma_op.mma_op(
+                            mma_op.load_a(A_mma_tile),
+                            mma_op.load_b(B_mma_tile),
+                            C_result
+                        )
+                        C_result.copy_from(result)
+
+        for mma_m in range(WM // MMA_M):
+            for mma_n in range(WN // MMA_N):
+                C_mma_tile = C_warp_tile.tile[MMA_M, MMA_N](mma_m, mma_n)
+                C_result = C_reg_tile.tile[1, 4](mma_m, mma_n)
+                mma_op.store_d(C_mma_tile, C_result)
+
+
 @compiler.register("my_matmul")
 struct MyMatMul[algorithm: StaticString]:
     @staticmethod
@@ -433,12 +500,12 @@ struct MyMatMul[algorithm: StaticString]:
             0, # fill zeros
         )
 
-        alias OPTIMIZED_BLOCK_SIZE = 16
-        alias BM = OPTIMIZED_BLOCK_SIZE
-        alias BN = OPTIMIZED_BLOCK_SIZE
-        alias BK = OPTIMIZED_BLOCK_SIZE
+        comptime OPTIMIZED_BLOCK_SIZE = 16 if has_amd_gpu_accelerator() else 32
 
         if algorithm == "naive":
+            comptime BM = OPTIMIZED_BLOCK_SIZE
+            comptime BN = OPTIMIZED_BLOCK_SIZE
+
             device_ctx.enqueue_function[
                 naive_matmul[
                     output.dtype, A.layout, B.layout, output.layout
@@ -450,6 +517,9 @@ struct MyMatMul[algorithm: StaticString]:
             )
 
         elif algorithm == "coalescing":
+            comptime BM = OPTIMIZED_BLOCK_SIZE
+            comptime BN = OPTIMIZED_BLOCK_SIZE
+
             device_ctx.enqueue_function[
                 coalescing_matmul[
                     output.dtype, A.layout, B.layout, output.layout
@@ -461,6 +531,10 @@ struct MyMatMul[algorithm: StaticString]:
             )
 
         elif algorithm == "tiled":
+            comptime BM = OPTIMIZED_BLOCK_SIZE
+            comptime BN = OPTIMIZED_BLOCK_SIZE
+            comptime BK = OPTIMIZED_BLOCK_SIZE
+
             alias NUM_THREADS = BM * BN
             device_ctx.enqueue_function[
                 tiled_matmul[
@@ -474,6 +548,10 @@ struct MyMatMul[algorithm: StaticString]:
             )
 
         elif algorithm == "tiled_register":
+            comptime BM = 128
+            comptime BN = 128
+            comptime BK = 8
+
             comptime TM = 16
             comptime COMPUTE_THREADS = (BM * BN) // TM
             comptime COPY_THREADS = max(BM * BK, BK * BN)
@@ -491,6 +569,10 @@ struct MyMatMul[algorithm: StaticString]:
             )
 
         elif algorithm == "block_tiling":
+            comptime BM = 128
+            comptime BN = 128
+            comptime BK = 8
+
             comptime TM = 4
             comptime TN = 4
             comptime COMPUTE_THREADS = (BM * BN) // (TM * TN)
@@ -509,6 +591,10 @@ struct MyMatMul[algorithm: StaticString]:
             )
 
         elif algorithm == "block_tiling_vectorized":
+            comptime BM = 64
+            comptime BN = 64
+            comptime BK = 16
+
             comptime TM = 4
             comptime TN = 4
             comptime COMPUTE_THREADS = (BM * BN) // (TM * TN)
@@ -524,6 +610,32 @@ struct MyMatMul[algorithm: StaticString]:
                 A, B, output,
                 grid_dim=(ceildiv(N, BN), ceildiv(M, BM)),
                 block_dim=NUM_THREADS,
+            )
+
+        elif algorithm == "tensor_core_matmul":
+            comptime BM = 64
+            comptime BN = 64
+            comptime BK = OPTIMIZED_BLOCK_SIZE
+
+            comptime WM = 32
+            comptime WN = WARP_SIZE
+
+            comptime MMA_M = 16
+            comptime MMA_N = 16 if has_amd_gpu_accelerator() else 8
+            comptime MMA_K = 4
+            comptime NUM_WARPS = (BM // WM) * (BN // WN)
+
+            device_ctx.enqueue_function[
+                tensor_core_matmul_kernel[
+                    output.dtype, A.layout, B.layout, output.layout,
+                    BM, BK, BN,
+                    WM, WN,
+                    MMA_M, MMA_K, MMA_N
+                ]
+            ](
+                A, B, output,
+                grid_dim=(ceildiv(N, BN), ceildiv(M, BM)),
+                block_dim=(NUM_WARPS * WARP_SIZE)
             )
 
         else:
