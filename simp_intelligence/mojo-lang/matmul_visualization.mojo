@@ -23,10 +23,8 @@ def tensor_core_matmul_kernel[
         warp_y = warp_id() // UInt(BN // WN)
         warp_x = warp_id() % UInt(BN // WN)
 
-        #var C_warp_tile = C.tile[BM, BN](block_idx.y, block_idx.x)
-        #                 .tile[WM, WN](Int(warp_y), Int(warp_x))
-
-        #mma_op = TensorCore[A.dtype, C.dtype, Index(MMA_M, MMA_N, MMA_K)]()
+        var C_warp_tile = C.tile[BM, BN](block_idx.y, block_idx.x)
+                         .tile[WM, WN](Int(warp_y), Int(warp_x))
 
         var A_smem_tile = LayoutTensor[
             dtype,
@@ -66,13 +64,15 @@ def tensor_core_matmul_kernel[
             for mma_k in range(BK // MMA_K):
                 for mma_m in range(WM // MMA_M):
                     for mma_n in range(WN // MMA_N):
-                        C_mma_tile = C_reg_tile.tile[1, 4](mma_m, mma_n)
-                        C_mma_tile.log(filename='C_mma_tile', mma_m=mma_m, mma_n=mma_n)
-
                         A_mma_tile = A_warp_tile.tile[MMA_M, MMA_K](mma_m, mma_k)
                         B_mma_tile = B_warp_tile.tile[MMA_K, MMA_N](mma_k, mma_n)
                         A_mma_tile.log(filename='A_mma_tile', mma_m=mma_m, mma_k=mma_k)
                         B_mma_tile.log(filename='B_mma_tile', mma_k=mma_k, mma_n=mma_n)
+
+        for mma_m in range(WM // MMA_M):
+            for mma_n in range(WN // MMA_N):
+                var C_mma_tile = C_warp_tile.tile[MMA_M, MMA_N](mma_m, mma_n)
+                C_mma_tile.log(filename='C_mma_tile', mma_m=mma_m, mma_n=mma_n)
 
 
 fn main() raises:
