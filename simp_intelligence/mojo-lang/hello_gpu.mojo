@@ -5,7 +5,7 @@ from gpu import (
     warp_id,
 )
 
-from gpu.host import DeviceContext
+from gpu.host import DeviceContext, DeviceAttribute
 from sys import has_accelerator
 
 
@@ -29,6 +29,13 @@ def main():
     else:
         ctx = DeviceContext()
         print("Found GPU:", ctx.name(), "\t WARP_SIZE:", WARP_SIZE)
+
+        print('COMPUTE_CAPABILITY_MAJOR', ctx.get_attribute(DeviceAttribute.COMPUTE_CAPABILITY_MAJOR))
+        print('COMPUTE_CAPABILITY_MINOR', ctx.get_attribute(DeviceAttribute.COMPUTE_CAPABILITY_MINOR))
+        print('MAX_THREADS_PER_BLOCK', ctx.get_attribute(DeviceAttribute.MAX_THREADS_PER_BLOCK))
+        print('MAX_BLOCKS_PER_MULTIPROCESSOR', ctx.get_attribute(DeviceAttribute.MAX_BLOCKS_PER_MULTIPROCESSOR))
+        print('MAX_REGISTERS_PER_MULTIPROCESSOR', ctx.get_attribute(DeviceAttribute.MAX_REGISTERS_PER_MULTIPROCESSOR))
+        print('MAX_SHARED_MEMORY_PER_BLOCK', ctx.get_attribute(DeviceAttribute.MAX_SHARED_MEMORY_PER_BLOCK))
         ctx.enqueue_function_checked[print_threads, print_threads](
             grid_dim=2, block_dim=128
         )
