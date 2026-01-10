@@ -1,5 +1,5 @@
 from .log_layout_tensor import LoggedTensor, example_logged_tensor
-from .mock_gpu import block_idx, thread_idx, barrier, warp_id
+from .mock_gpu import block_idx, thread_idx, barrier, warp_id, WARP_SIZE
 
 from pathlib import Path
 import os
