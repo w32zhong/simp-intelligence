@@ -1,10 +1,9 @@
 from layout import Layout
 from visualization_utils import LoggedTensor as LayoutTensor
-from visualization_utils import block_idx, thread_idx, barrier, warp_id
+from visualization_utils import block_idx, thread_idx, barrier, warp_id, WARP_SIZE
 from visualization_utils import example_logged_tensor, clear_log_files
 
 from math import ceildiv
-from gpu import WARP_SIZE
 from layout.tensor_core import TensorCore
 from utils.index import Index
 
@@ -55,7 +54,7 @@ def tensor_core_matmul_kernel[
             B_dram_tile = B.tile[BK, BN](block, Int(block_idx.x))
 
             A_smem_tile.copy_from(A_dram_tile)
-            A_smem_tile.copy_from(A_dram_tile)
+            B_smem_tile.copy_from(B_dram_tile)
             A_smem_tile.log(filename='A_tile', block=block)
             B_smem_tile.log(filename='B_tile', block=block)
 
@@ -68,12 +67,12 @@ def tensor_core_matmul_kernel[
                 for mma_m in range(WM // MMA_M):
                     for mma_n in range(WN // MMA_N):
                         C_mma_tile = C_reg_tile.tile[1, 4](mma_m, mma_n)
-                        C_mma_tile.log(filename='C_mma_tile')
+                        C_mma_tile.log(filename='C_mma_tile', mma_m=mma_m, mma_n=mma_n)
 
                         A_mma_tile = A_warp_tile.tile[MMA_M, MMA_K](mma_m, mma_k)
                         B_mma_tile = B_warp_tile.tile[MMA_K, MMA_N](mma_k, mma_n)
-                        A_mma_tile.log(filename='A_mma_tile')
-                        B_mma_tile.log(filename='B_mma_tile')
+                        A_mma_tile.log(filename='A_mma_tile', mma_m=mma_m, mma_k=mma_k)
+                        B_mma_tile.log(filename='B_mma_tile', mma_k=mma_k, mma_n=mma_n)
 
 
 fn main() raises:
@@ -91,7 +90,7 @@ fn main() raises:
     comptime BN = OPTIMIZED_BLOCK_SIZE
     comptime BK = OPTIMIZED_BLOCK_SIZE
     comptime WM = 8
-    comptime WN = 8
+    comptime WN = WARP_SIZE
     comptime MMA_M = 4
     comptime MMA_N = 4
     comptime MMA_K = 2
