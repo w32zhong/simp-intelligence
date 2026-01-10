@@ -25,6 +25,8 @@ def tensor_core_matmul_kernel[
 
         var C_warp_tile = C.tile[BM, BN](block_idx.y, block_idx.x)
                          .tile[WM, WN](Int(warp_y), Int(warp_x))
+        C.tile[BM, BN](block_idx.y, block_idx.x).log(filename='C_tile')
+        C_warp_tile.log(filename='C_warp_tile')
 
         var A_smem_tile = LayoutTensor[
             dtype,

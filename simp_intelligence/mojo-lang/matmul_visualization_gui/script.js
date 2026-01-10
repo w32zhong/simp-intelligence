@@ -184,6 +184,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         const bKey = `${bk}_${bx}`;
         const bTile = tiles.B_tile[bKey];
         if (bTile) highlightTile(ctxB, bTile, 'rgba(40, 167, 69, 0.3)'); // Green
+
+        // C: Key "by_bx"
+        const cKey = `${by}_${bx}`;
+        const cTile = tiles.C_tile[cKey];
+        if (cTile) {
+            highlightTile(ctxC, cTile, 'rgba(155, 89, 182, 0.3)'); // Purple
+        }
         
         // 2. Warp Tiles (Shared -> Reg/Warp)
         // Key: bx_by_tx_bk
@@ -193,8 +200,26 @@ document.addEventListener('DOMContentLoaded', async () => {
         const aWarp = tiles.A_warp[warpKey];
         const bWarp = tiles.B_warp[warpKey];
         
-        if (aWarp) highlightTile(ctxA, aWarp, 'rgba(0, 123, 255, 0.4)'); // Blue
-        if (bWarp) highlightTile(ctxB, bWarp, 'rgba(0, 123, 255, 0.4)'); // Blue
+        const drawWarpBorder = (ctx, tile) => {
+            if (!tile) return;
+            const px = tile.y * currentScale;
+            const py = tile.x * currentScale;
+            const pw = tile.w * currentScale;
+            const ph = tile.h * currentScale;
+            ctx.strokeStyle = 'rgba(0, 123, 255, 1.0)'; // Blue border
+            ctx.lineWidth = 3;
+            ctx.setLineDash([5, 5]); // Dashed line
+            ctx.strokeRect(px, py, pw, ph);
+            ctx.setLineDash([]); // Reset to solid
+        };
+
+        drawWarpBorder(ctxA, aWarp);
+        drawWarpBorder(ctxB, bWarp);
+
+        // C Warp Tile (Key: bx_by_tx)
+        const cWarpKey = `${bx}_${by}_${tx}`;
+        const cWarp = tiles.C_warp[cWarpKey];
+        drawWarpBorder(ctxC, cWarp);
         
         // 3. MMA Tiles (Reg -> Compute)
         // Key: bx_by_tx
@@ -202,33 +227,26 @@ document.addEventListener('DOMContentLoaded', async () => {
         const mmaKey = `${bx}_${by}_${tx}`;
         const globalStep = bk * steps.total_per_k + step;
         
-        const getMmaTile = (collection) => {
+        // For C, we want to show the tile being updated, which depends only on mmaM and mmaN.
+        // It does not change with Block K or MMA K.
+        // We pick the entry corresponding to k=0, block=0 for the current mmaM, mmaN.
+        // Loop order: k -> m -> n.
+        // Index for k=0 is: mmaM * steps.n_steps + mmaN.
+        const cStep = mmaM * steps.n_steps + mmaN;
+
+        const getMmaTile = (collection, s) => {
             const list = collection[mmaKey];
-            if (list && list[globalStep]) return list[globalStep];
+            if (list && list[s]) return list[s];
             return null;
         };
 
-        const aMma = getMmaTile(tiles.A_mma);
-        const bMma = getMmaTile(tiles.B_mma);
-        const cMma = getMmaTile(tiles.C_mma);
+        const aMma = getMmaTile(tiles.A_mma, globalStep);
+        const bMma = getMmaTile(tiles.B_mma, globalStep);
+        const cMma = getMmaTile(tiles.C_mma, cStep);
         
         if (aMma) highlightTile(ctxA, aMma, 'rgba(220, 53, 69, 0.7)'); // Red
         if (bMma) highlightTile(ctxB, bMma, 'rgba(220, 53, 69, 0.7)'); // Red
         if (cMma) highlightTile(ctxC, cMma, 'rgba(255, 193, 7, 0.7)'); // Yellow
-        
-        // Also highlight C Block (Result) - Not logged explicitly?
-        // Usually C block is M x N block corresponding to bx, by.
-        // dims.BM x dims.BN.
-        // x (col) = bx * BN. y (row) = by * BM.
-        const cBlockTile = { 
-            x: by * dims.BM, // Row
-            y: bx * dims.BN, // Col
-            w: dims.BN, 
-            h: dims.BM 
-        };
-        // Draw outline for C block
-        // highlightTile(ctxC, cBlockTile, 'rgba(0,0,0,0.1)', 1);
-        // Maybe just a subtle border
     }
 
     sliderBlockCol.addEventListener('input', update);

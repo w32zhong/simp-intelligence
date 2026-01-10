@@ -32,16 +32,16 @@
         </div>
         
         <div class="control-group">
-            <label>MMA K: <span id="valMmaK">0</span></label>
-            <input type="range" id="mmaK" min="0" value="0">
-        </div>
-        <div class="control-group">
             <label>MMA M: <span id="valMmaM">0</span></label>
             <input type="range" id="mmaM" min="0" value="0">
         </div>
         <div class="control-group">
             <label>MMA N: <span id="valMmaN">0</span></label>
             <input type="range" id="mmaN" min="0" value="0">
+        </div>
+        <div class="control-group">
+            <label>MMA K: <span id="valMmaK">0</span></label>
+            <input type="range" id="mmaK" min="0" value="0">
         </div>
 
                 <div class="control-group">
@@ -70,19 +70,23 @@
             <div class="legend">
                 <div class="legend-item">
                     <div class="color-box block-color"></div>
-                    <span>Target Block (C)</span>
+                    <span>C_tile</span>
+                </div>
+                <div class="legend-item">
+                    <div class="color-box warp-color"></div>
+                    <span>C_warp_tile / A_warp_tile / B_warp_tile</span>
                 </div>
                 <div class="legend-item">
                     <div class="color-box thread-color"></div>
-                    <span>Target Thread (C)</span>
+                    <span>C_mma_tile</span>
                 </div>
                 <div class="legend-item">
                     <div class="color-box input-color"></div>
-                    <span>Input Tile (A & B)</span>
+                    <span>A_tile / B_tile</span>
                 </div>
                 <div class="legend-item">
                     <div class="color-box subtile-color"></div>
-                    <span>Sub-Tile (Inner K)</span>
+                    <span>A_mma_tile / B_mma_tile</span>
                 </div>
             </div>
         </div>

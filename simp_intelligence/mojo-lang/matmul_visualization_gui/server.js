@@ -7,8 +7,10 @@ const PORT = 3000;
 const LOG_FILES = {
     A_tile: path.join(__dirname, '../A_tile.log'),
     B_tile: path.join(__dirname, '../B_tile.log'),
+    C_tile: path.join(__dirname, '../C_tile.log'),
     A_warp: path.join(__dirname, '../A_warp_tile.log'),
     B_warp: path.join(__dirname, '../B_warp_tile.log'),
+    C_warp: path.join(__dirname, '../C_warp_tile.log'),
     A_mma: path.join(__dirname, '../A_mma_tile.log'),
     B_mma: path.join(__dirname, '../B_mma_tile.log'),
     C_mma: path.join(__dirname, '../C_mma_tile.log')
@@ -74,8 +76,10 @@ async function parseLogs() {
     const tiles = {
         A_tile: {},
         B_tile: {},
+        C_tile: {},
         A_warp: {},
         B_warp: {},
+        C_warp: {},
         A_mma: {},
         B_mma: {},
         C_mma: {}
@@ -120,18 +124,27 @@ async function parseLogs() {
                     h: entry['n_rows']
                 };
 
-                if (type === 'A_tile' || type === 'B_tile') {
-                    // Key: by_k for A, k_bx for B
+                if (type === 'A_tile' || type === 'B_tile' || type === 'C_tile') {
+                    // Key: by_k for A, k_bx for B, by_bx for C
                     const k = entry['block'];
-                    limits.max_block_k = Math.max(limits.max_block_k, k);
+                    if (k !== undefined) limits.max_block_k = Math.max(limits.max_block_k, k);
                     
-                    const key = type === 'A_tile' ? `${by}_${k}` : `${k}_${bx}`;
+                    let key;
+                    if (type === 'A_tile') key = `${by}_${k}`;
+                    else if (type === 'B_tile') key = `${k}_${bx}`;
+                    else if (type === 'C_tile') key = `${by}_${bx}`;
+                    
                     storage[key] = tile;
                 } 
                 else if (type === 'A_warp' || type === 'B_warp') {
                     // Key: bx_by_tx_k (Need k because it changes per block loop)
                     const k = entry['block'];
                     const key = `${bx}_${by}_${tx}_${k}`;
+                    storage[key] = tile;
+                }
+                else if (type === 'C_warp') {
+                    // Key: bx_by_tx
+                    const key = `${bx}_${by}_${tx}`;
                     storage[key] = tile;
                 }
                 else if (type.includes('mma')) {
@@ -149,8 +162,10 @@ async function parseLogs() {
 
     await processFile(LOG_FILES.A_tile, 'A_tile', tiles.A_tile);
     await processFile(LOG_FILES.B_tile, 'B_tile', tiles.B_tile);
+    await processFile(LOG_FILES.C_tile, 'C_tile', tiles.C_tile);
     await processFile(LOG_FILES.A_warp, 'A_warp', tiles.A_warp);
     await processFile(LOG_FILES.B_warp, 'B_warp', tiles.B_warp);
+    await processFile(LOG_FILES.C_warp, 'C_warp', tiles.C_warp);
     await processFile(LOG_FILES.A_mma, 'A_mma', tiles.A_mma);
     await processFile(LOG_FILES.B_mma, 'B_mma', tiles.B_mma);
     await processFile(LOG_FILES.C_mma, 'C_mma', tiles.C_mma);
