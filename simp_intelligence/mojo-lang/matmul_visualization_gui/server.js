@@ -16,6 +16,7 @@ const LOG_FILES = {
     C_mma: path.join(__dirname, '../C_mma_tile.log')
 };
 const MOJO_FILE = path.join(__dirname, '../matmul_visualization.mojo');
+const MOCK_GPU_FILE = path.join(__dirname, '../visualization_utils/mock_gpu.mojo');
 
 let cachedData = null;
 
@@ -25,19 +26,32 @@ async function getMatrixDimensions() {
         BM: 16, BN: 16, BK: 16, 
         WM: 8, WN: 8, 
         MMA_M: 4, MMA_N: 4, MMA_K: 2,
-        NUM_WARPS: 4, WARP_SIZE: 8
+        NUM_WARPS: 4, WARP_SIZE: 32
     };
+
+    // Parse WARP_SIZE from mock_gpu.mojo first
+    if (fs.existsSync(MOCK_GPU_FILE)) {
+        const mockContent = fs.readFileSync(MOCK_GPU_FILE, 'utf-8');
+        const match = mockContent.match(/comptime\s+WARP_SIZE\s*=\s*(\d+)/);
+        if (match) {
+            dims.WARP_SIZE = parseInt(match[1], 10);
+        }
+    }
 
     if (fs.existsSync(MOJO_FILE)) {
         const content = fs.readFileSync(MOJO_FILE, 'utf-8');
         
         const parse = (name, def) => {
-            const re = new RegExp(`(alias|comptime)\\s+${name}\\s*=\s*(\\d+|OPTIMIZED_BLOCK_SIZE)`);
+            const re = new RegExp(`(alias|comptime)\\s+${name}\\s*=\\s*(\\d+|OPTIMIZED_BLOCK_SIZE|WARP_SIZE)`);
             const match = content.match(re);
             if (!match) return def;
+            
             if (match[2] === 'OPTIMIZED_BLOCK_SIZE') {
                 const optMatch = content.match(/comptime\s+OPTIMIZED_BLOCK_SIZE\s*=\s*(\d+)/);
                 return optMatch ? parseInt(optMatch[1], 10) : 16;
+            }
+            if (match[2] === 'WARP_SIZE') {
+                return dims.WARP_SIZE;
             }
             return parseInt(match[2], 10);
         };
