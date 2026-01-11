@@ -436,6 +436,8 @@ fn tensor_core_matmul_kernel[
 
         var C_reg_tile = LayoutTensor[
             dtype,
+            # allocated with a layout that accommodates all fragments a warp generates
+            # (4 elements per op)
             Layout.row_major(WM // MMA_M, (WN * 4) // MMA_N),
             MutAnyOrigin,
             address_space = AddressSpace.LOCAL,
@@ -459,6 +461,9 @@ fn tensor_core_matmul_kernel[
                         A_mma_tile = A_warp_tile.tile[MMA_M, MMA_K](mma_m, mma_k)
                         B_mma_tile = B_warp_tile.tile[MMA_K, MMA_N](mma_k, mma_n)
 
+                        # for m16n8 fragment (MMA_M=16 and MMA_N=8), the total C
+                        # matrix fragment is 128. Since a warp is 32 threads, each
+                        # thread is responsible for 128 / 32 = 4 elements.
                         C_result = C_reg_tile.tile[1, 4](mma_m, mma_n)
                         var result = mma_op.mma_op(
                             mma_op.load_a(A_mma_tile),
