@@ -408,15 +408,17 @@ fn tensor_core_matmul_kernel[
         B: LayoutTensor[dtype, B_layout, MutAnyOrigin],
         C: LayoutTensor[dtype, C_layout, MutAnyOrigin],
     ):
-        var M = A.shape[0]()
-        var K = B.shape[0]()
-        var N = B.shape[1]()
+        var M = A.dim[0]()
+        var K = B.dim[0]()
+        var N = B.dim[1]()
 
         warp_y = warp_id() // UInt(BN // WN)
         warp_x = warp_id() % UInt(BN // WN)
 
         var C_warp_tile = C.tile[BM, BN](block_idx.y, block_idx.x)
                          .tile[WM, WN](Int(warp_y), Int(warp_x))
+
+        mma_op = TensorCore[A.dtype, C.dtype, Index(MMA_M, MMA_N, MMA_K)]()
 
         var A_smem_tile = LayoutTensor[
             dtype,
@@ -439,14 +441,14 @@ fn tensor_core_matmul_kernel[
             address_space = AddressSpace.LOCAL,
         ].stack_allocation().fill(0)
 
-        mma_op = TensorCore[A.dtype, C.dtype, Index(MMA_M, MMA_N, MMA_K)]()
-
         for block in range(ceildiv(K, BK)):
             A_dram_tile = A.tile[BM, BK](Int(block_idx.y), block)
             B_dram_tile = B.tile[BK, BN](block, Int(block_idx.x))
 
-            A_smem_tile.copy_from(A_dram_tile)
-            B_smem_tile.copy_from(B_dram_tile)
+            copy_dram_to_sram_async[thread_layout=Layout.row_major(4, 8)](A_smem_tile, A_dram_tile)
+            copy_dram_to_sram_async[thread_layout=Layout.row_major(4, 8)](B_smem_tile, B_dram_tile)
+            async_copy_wait_all()
+            barrier()
 
             A_warp_tile = A_smem_tile.tile[WM, BK](Int(warp_y), 0)
             B_warp_tile = B_smem_tile.tile[BK, WN](0, Int(warp_x))
@@ -464,6 +466,7 @@ fn tensor_core_matmul_kernel[
                             C_result
                         )
                         C_result.copy_from(result)
+            barrier()
 
         for mma_m in range(WM // MMA_M):
             for mma_n in range(WN // MMA_N):
