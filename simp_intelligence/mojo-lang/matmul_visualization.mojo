@@ -80,22 +80,23 @@ def tensor_core_matmul_kernel[
 fn main() raises:
     clear_log_files()
 
-    alias M = 64
-    alias K = 48
-    alias N = 64
+    alias M = 128
+    alias K = 128
+    alias N = 128
     A = example_logged_tensor[M, K]("A")
     B = example_logged_tensor[K, N]("B")
     C = example_logged_tensor[M, N]("C")
 
-    comptime OPTIMIZED_BLOCK_SIZE = 16
-    comptime BM = OPTIMIZED_BLOCK_SIZE
-    comptime BN = OPTIMIZED_BLOCK_SIZE
-    comptime BK = OPTIMIZED_BLOCK_SIZE
-    comptime WM = 8
+    comptime BM = 64
+    comptime BN = 64
+    comptime BK = 32
+
+    comptime WM = 32
     comptime WN = WARP_SIZE
-    comptime MMA_M = 4
-    comptime MMA_N = 4
-    comptime MMA_K = 2
+
+    comptime MMA_M = 16
+    comptime MMA_N = 8
+    comptime MMA_K = 4
     comptime NUM_WARPS = (BM // WM) * (BN // WN)
 
     constrained[

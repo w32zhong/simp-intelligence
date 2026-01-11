@@ -43,7 +43,7 @@ fn barrier():
     return
 
 
-comptime WARP_SIZE = 8
+comptime WARP_SIZE = 32
 
 
 fn warp_id() -> UInt:
