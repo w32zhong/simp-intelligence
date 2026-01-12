@@ -1,3 +1,7 @@
+# A minimal code to demonstrate the idea of backward()
+# taking the inspriation from both Pytorch and lucasdelimanogueira/PyNorch>
+
+
 import numpy as np
 
 
@@ -7,6 +11,15 @@ class AddBackward:
 
     def backward(self, gradient):
         return [gradient, gradient]
+
+
+class ScalarMulBackward:
+    def __init__(self, x, scalar):
+        self.input = [x]
+        self.scalar = scalar
+
+    def backward(self, gradient):
+        return [gradient * self.scalar]
 
 
 class SumBackward:
@@ -19,16 +32,16 @@ class SumBackward:
             # If axis is None, sum reduces the tensor to a scalar.
             grad_output = Tensor(gradient.data * np.ones_like(self.input[0].data))
         else:
-            raise NotImplemented
+            raise NotImplementedError
         
         return [grad_output]
 
 
 class Tensor:
-    def __init__(self, data=None, requires_grad=False):
+    def __init__(self, data=None, requires_grad=False, grad_fn=None):
         self.requires_grad = requires_grad
         self.grad = None
-        self.grad_fn = None
+        self.grad_fn = grad_fn if requires_grad else None
         self.data = data if isinstance(data, np.ndarray) else np.array(data)
 
     def __repr__(self):
@@ -42,18 +55,27 @@ class Tensor:
         return repr.rstrip(' ,') + ')'
 
     def __add__(self, other):
-        requires_grad = self.requires_grad or other.requires_grad
-        result = Tensor(self.data + other.data, requires_grad=requires_grad)
-        if requires_grad:
-            result.grad_fn = AddBackward(self, other)
-        return result
+        return Tensor(
+            self.data + other.data,
+            requires_grad=self.requires_grad or other.requires_grad,
+            grad_fn=AddBackward(self, other)
+        )
+
+    def __mul__(self, other):
+        if not isinstance(other, (int, float)):
+            raise NotImplementedError
+        return Tensor(
+            self.data * other,
+            requires_grad=self.requires_grad,
+            grad_fn=ScalarMulBackward(self, other)
+        )
 
     def sum(self, axis=None):
-        requires_grad = self.requires_grad
-        result = Tensor(self.data.sum(axis=axis), requires_grad=requires_grad)
-        if requires_grad:
-            result.grad_fn = SumBackward(self, axis)
-        return result
+        return Tensor(
+            self.data.sum(axis=axis),
+            requires_grad=self.requires_grad,
+            grad_fn = SumBackward(self, axis)
+        )
 
     def is_leaf(self):
         return self.grad_fn is None
@@ -92,21 +114,21 @@ class Tensor:
 if __name__ == "__main__":
     t1 = Tensor([[[1, 2.5], [3, -4]], [[5, 6], [7, 8]]], requires_grad=True)
     t2 = Tensor([[[1, 1.], [1, 1.9]], [[1, 1], [1, 1]]], requires_grad=True)
-    t3 = (t1 + t2).sum()
+    t3 = (t1 * 123 + t2 * 321).sum()
     print(t3)
     t3.backward()
+    print(t3.grad)
     print(t1.grad)
     print(t2.grad)
-    print(t3.grad)
     print('-' * 80)
 
     import torch
     v1 = torch.tensor([[[1, 2.5], [3, -4]], [[5, 6], [7, 8]]], requires_grad=True)
     v2 = torch.tensor([[[1, 1.], [1, 1.9]], [[1, 1], [1, 1]]], requires_grad=True)
-    v3 = (v1 + v2).sum()
-    v3.retain_grad()
+    v3 = (v1 * 123 + v2 * 321).sum()
+    v3.retain_grad() # pytorch requires non-leaf root to explicitly call this to retain gradients.
     print(v3)
     v3.backward()
+    print(v3.grad)
     print(v1.grad)
     print(v2.grad)
-    print(v3.grad)
