@@ -4,6 +4,21 @@
 
 import numpy as np
 from collections import defaultdict
+from contextlib import contextmanager
+
+
+_grad_enabled = True
+
+
+class no_grad:
+    def __enter__(self):
+        global _grad_enabled
+        self.prev = _grad_enabled
+        _grad_enabled = False
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        global _grad_enabled
+        _grad_enabled = self.prev
 
 
 class AddBackward:
@@ -68,26 +83,29 @@ class Tensor:
         return repr.rstrip(' ,') + ')'
 
     def __add__(self, other):
+        should_track = (self.requires_grad or other.requires_grad) and _grad_enabled
         return Tensor(
             self.data + other.data,
-            requires_grad=self.requires_grad or other.requires_grad,
-            grad_fn=AddBackward(self, other)
+            requires_grad=should_track,
+            grad_fn=AddBackward(self, other) if should_track else None
         )
 
     def __mul__(self, other):
         if not isinstance(other, (int, float)):
             raise NotImplementedError
+        should_track = self.requires_grad and _grad_enabled
         return Tensor(
             self.data * other,
-            requires_grad=self.requires_grad,
-            grad_fn=ScalarMulBackward(self, other)
+            requires_grad=should_track,
+            grad_fn=ScalarMulBackward(self, other) if should_track else None
         )
 
     def sum(self, axis=None):
+        should_track = self.requires_grad and _grad_enabled
         return Tensor(
             self.data.sum(axis=axis),
-            requires_grad=self.requires_grad,
-            grad_fn = SumBackward(self, axis)
+            requires_grad=should_track,
+            grad_fn = SumBackward(self, axis) if should_track else None
         )
 
     def backward(self, gradient=None):
@@ -130,7 +148,7 @@ class Tensor:
                     gradient_dict[u].append(grad)
 
 
-def test(t1):
+def test_backward(t1):
     #         x2         x3
     # tensor1 -- tensor2 -- tensor3 -+ tensor5
     #       \__x4___ tensor4 _______/
@@ -156,10 +174,31 @@ def test(t1):
     print('-' * 80)
 
 
+def test_no_grad_context():
+    x = Tensor([1.0], requires_grad=True)
+    with no_grad():
+        y = x * 2
+
+    if y.requires_grad or y.grad_fn is not None:
+        print("FAILURE: y should not require grad inside no_grad block")
+    else:
+        print("SUCCESS: y does not require grad inside no_grad block")
+
+    # Verify outside context
+    z = x * 2
+    if z.requires_grad and z.grad_fn is not None:
+        print("SUCCESS: z requires grad outside no_grad block")
+    else:
+        print("FAILURE: z should require grad outside no_grad block")
+    print('-' * 80)
+
+
 if __name__ == "__main__":
     t1 = Tensor([1, 2.1], requires_grad=True)
-    test(t1)
+    test_backward(t1)
 
     import torch
     t1 = torch.tensor([1, 2.1], requires_grad=True)
-    test(t1)
+    test_backward(t1)
+
+    test_no_grad_context()
