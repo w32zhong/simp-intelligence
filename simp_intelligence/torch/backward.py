@@ -1,5 +1,6 @@
-# A minimal code to demonstrate the idea of backward()
-# taking the inspriation from both Pytorch and lucasdelimanogueira/PyNorch>
+# A minimal code to demonstrate the core idea of backward(),
+# taking the inspriation from both Pytorch and lucasdelimanogueira/PyNorch.
+# Note that "broadcasting" and many other details are not handled in this toy.
 
 
 import numpy as np
@@ -23,6 +24,9 @@ class no_grad:
 
 class AddBackward:
     def __init__(self, x, y):
+        # Note: PyTorch uses a context object (ctx) to save tensors for backward, i.e.,
+        # ctx.save_for_backward(x). Here we just store as Backward "input" for simplicity,
+        # of course, this only works if backward() always happens in the same context.
         self.input = [x, y]
 
     def backward(self, gradient):
@@ -113,9 +117,12 @@ class Tensor:
 
     def backward(self, gradient=None):
         if not self.requires_grad:
+            # requires_grad decides where the backward pass stops
             return
         elif gradient is not None and gradient.data.ndim != 0:
-            raise ValueError("Gradient argument must be a scalar tensor.")
+            # this toy code only handles a scalar gradient, in reality, pytorch allows
+            # calling .backward() on non-scalar tensors using a Vector-Jacobian product.
+            raise NotImplementedError
 
         # topological ordering. Also see Andrej Karpathy's micro_grad:
         # https://youtu.be/VMj-3S1tku0?si=T6W-N0vhXpoqQZIU&t=4692
