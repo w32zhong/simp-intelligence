@@ -3,6 +3,7 @@
 
 
 import numpy as np
+from collections import defaultdict
 
 
 class AddBackward:
@@ -33,16 +34,28 @@ class SumBackward:
             grad_output = Tensor(gradient.data * np.ones_like(self.input[0].data))
         else:
             raise NotImplementedError
-        
         return [grad_output]
 
 
 class Tensor:
     def __init__(self, data=None, requires_grad=False, grad_fn=None):
         self.requires_grad = requires_grad
+        self.retains_grad = False
         self.grad = None
         self.grad_fn = grad_fn if requires_grad else None
         self.data = data if isinstance(data, np.ndarray) else np.array(data)
+
+    def is_non_leaf(self):
+        return self.grad_fn is not None
+
+    def retain_grad(self):
+        self.retains_grad = True
+
+    def _accum_grads(self, grad):
+        print(self, 'accum_grads:', grad)
+        if self.grad is None:
+            self.grad = 0
+        self.grad += grad.data
 
     def __repr__(self):
         repr = f'Tensor({self.data}, '
@@ -51,7 +64,7 @@ class Tensor:
         if self.grad_fn is not None:
             repr += f'grad_fn={self.grad_fn.__class__.__name__}, '
         if self.grad is not None:
-            repr += f'grad_fn={self.grad}, '
+            repr += f'grad={self.grad}, '
         return repr.rstrip(' ,') + ')'
 
     def __add__(self, other):
@@ -77,58 +90,76 @@ class Tensor:
             grad_fn = SumBackward(self, axis)
         )
 
-    def is_leaf(self):
-        return self.grad_fn is None
-
     def backward(self, gradient=None):
         if not self.requires_grad:
             return
-                
-        if gradient is None:
-            if self.data.ndim == 0:
-                gradient = Tensor(1)
-            else:
-                raise RuntimeError("Gradient argument must be specified for non-scalar tensors.")
+        elif gradient is not None and gradient.data.ndim != 0:
+            raise ValueError("Gradient argument must be a scalar tensor.")
 
         # topological ordering. Also see Andrej Karpathy's micro_grad:
         # https://youtu.be/VMj-3S1tku0?si=T6W-N0vhXpoqQZIU&t=4692
         topo = []
         visited = set()
-        def build_topo(v, grad):
+        def build_topo(v):
             if v not in visited:
                 visited.add(v)
-                if not v.is_leaf():
-                    inputs = v.grad_fn.input
-                    input_grads = v.grad_fn.backward(grad)
-                    for input_tensor, input_grad in zip(inputs, input_grads):
-                        build_topo(input_tensor, input_grad)
-                topo.append((v, grad))
-        build_topo(self, gradient)
+                if v.is_non_leaf():
+                    for u in v.grad_fn.input:
+                        build_topo(u)
+                topo.append(v)
+        build_topo(self)
 
-        for v, grad in reversed(topo):
-            if v.grad is None:
-                v.grad = 0
-            v.grad += grad.data
+        # backprop and accumulate gradients
+        gradient_dict = defaultdict(list)
+        gradient_dict[self] = [gradient or Tensor(1)]
+        for v in reversed(topo):
+            # in a diamond graph, a vertex can have multiple incoming gradients
+            gradient = Tensor(0)
+            for grad in gradient_dict.get(v):
+                gradient = Tensor(gradient.data + grad.data)
+
+            # pytorch convention requires a non-leaf to explicitly retain gradients
+            if not v.is_non_leaf() or v.retains_grad:
+                v._accum_grads(gradient)
+
+            # backprop to children ...
+            if v.is_non_leaf():
+                inputs = v.grad_fn.input
+                input_grads = v.grad_fn.backward(gradient)
+                for u, grad in zip(inputs, input_grads):
+                    gradient_dict[u].append(grad)
+
+
+def test(t1):
+    #         x2         x3
+    # tensor1 -- tensor2 -- tensor3 -+ tensor5
+    #       \__x4___ tensor4 _______/
+    t2 = t1 * 2
+    t2.retain_grad()
+    t3 = t2 * 3
+    t3.retain_grad()
+    t4 = t1 * 4
+    t4.retain_grad()
+    t5 = (t3 + t4).sum()
+    t5.retain_grad()
+    print('t5', t5)
+    print('t4', t4)
+    print('t3', t3)
+    print('t2', t2)
+    print('t1', t1)
+    t5.backward()
+    print('t5.grad', t5.grad)
+    print('t4.grad', t4.grad)
+    print('t3.grad', t3.grad)
+    print('t2.grad', t2.grad)
+    print('t1.grad', t1.grad)
+    print('-' * 80)
 
 
 if __name__ == "__main__":
-    t1 = Tensor([[[1, 2.5], [3, -4]], [[5, 6], [7, 8]]], requires_grad=True)
-    t2 = Tensor([[[1, 1.], [1, 1.9]], [[1, 1], [1, 1]]], requires_grad=True)
-    t3 = (t1 * 123 + t2 * 321).sum()
-    print(t3)
-    t3.backward()
-    print(t3.grad)
-    print(t1.grad)
-    print(t2.grad)
-    print('-' * 80)
+    t1 = Tensor([1, 2.1], requires_grad=True)
+    test(t1)
 
     import torch
-    v1 = torch.tensor([[[1, 2.5], [3, -4]], [[5, 6], [7, 8]]], requires_grad=True)
-    v2 = torch.tensor([[[1, 1.], [1, 1.9]], [[1, 1], [1, 1]]], requires_grad=True)
-    v3 = (v1 * 123 + v2 * 321).sum()
-    v3.retain_grad() # pytorch requires non-leaf root to explicitly call this to retain gradients.
-    print(v3)
-    v3.backward()
-    print(v3.grad)
-    print(v1.grad)
-    print(v2.grad)
+    t1 = torch.tensor([1, 2.1], requires_grad=True)
+    test(t1)
