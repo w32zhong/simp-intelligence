@@ -108,6 +108,9 @@ class Tensor:
             grad_fn = SumBackward(self, axis) if should_track else None
         )
 
+    def detach(self):
+        return Tensor(self.data, requires_grad=False)
+
     def backward(self, gradient=None):
         if not self.requires_grad:
             return
@@ -175,6 +178,7 @@ def test_backward(t1):
 
 
 def test_no_grad_context():
+    print("Testing no_grad context:")
     x = Tensor([1.0], requires_grad=True)
     with no_grad():
         y = x * 2
@@ -193,12 +197,26 @@ def test_no_grad_context():
     print('-' * 80)
 
 
+def test_detach():
+    print("Testing detach:")
+    x = Tensor([1.0, 2.0], requires_grad=True)
+    y = x * 3
+    z = y.detach()
+
+    if z.requires_grad or z.grad_fn is not None:
+        print("FAILURE: detached tensor should not require grad")
+    else:
+        print("SUCCESS: detach works as expected")
+    print('-' * 80)
+
+
 if __name__ == "__main__":
     t1 = Tensor([1, 2.1], requires_grad=True)
     test_backward(t1)
-
     import torch
     t1 = torch.tensor([1, 2.1], requires_grad=True)
     test_backward(t1)
 
     test_no_grad_context()
+
+    test_detach()
