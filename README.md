@@ -1,25 +1,29 @@
 # About
 This is my learning environment and playground for GPU-stack software and AI algorithms.
 
-The SoTA GPU-stack software for LLM inference, in my view:
+My goal is to cover a deep stack:
 ```mermaid
 graph LR;
-  hgf[HuggingFace models] --> PyTorch;
-  hgf --> FLA --> Triton --> op_kernels;
-  MAX[Modular MAX] --> mojo_lib;
-  PyTorch --dispatch--> op_kernels;
+  hgf["HuggingFace / FLA"];
+  hgf --> PyTorch;
+  TorchTitan --> PyTorch;
+  SGLang["SGLang / Mini-SGL / EAGLE"];
+  CUDA["FlashInfer / CUTLASS"];
+  PyTorch["PyTorch Interface"];
+  SGLang --> CUDA --> GPU;
   SGLang --> PyTorch;
-  SGLang --> FlashInfer;
-  FlashInfer --> op_kernels;
-  FlashInfer --> CUDA;
-  FlashInfer --> CUTLASS;
-  CUTLASS --> CUDA --> op_kernels;
-  op_kernels[GPU operators] --> MLIR;
-  mojo_lib[Mojo library] --> mojo_lang;
-  mojo_lang[Mojo compiler] --> MLIR;
-  MLIR --> asm_OPT[optimizer passes / LLVM];
-  asm_OPT --> MLIR;
-  asm_OPT --> GPU[GPU];
+  Mojo["Mojo / Max"];
+  PyTorch --> Mojo --> MLIR;
+  Dynamo["Dynamo / FX Graph"];
+  PyTorch --> Dynamo --> Inductor --> Triton --> MLIR;
+  PyTorch --eager dispatch--> hardware;
+  MLIR["MLIR / LLVM"];
+  hardware["Heterogeneous Device"];
+  MLIR --> hardware;
+  MLIR --> hardware;
+  hardware --> GPU;
+  hardware --> CPU;
+  hardware --> Accel-Sim;
 ```
 
 ## Quick start
