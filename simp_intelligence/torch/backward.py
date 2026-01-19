@@ -28,8 +28,12 @@ class AddBackward:
         # ctx.save_for_backward(x). Here we just store as Backward "input" for simplicity,
         # of course, this only works if backward() always happens in the same context.
         self.input = [x, y]
+        self.saved_versions = [x._version, y._version]
 
     def backward(self, gradient):
+        for t, v in zip(self.input, self.saved_versions):
+            if t._version != v:
+                raise RuntimeError("one of the variables needed for gradient computation has been modified by an in-place operation")
         return [gradient, gradient]
 
 
@@ -37,8 +41,12 @@ class ScalarMulBackward:
     def __init__(self, x, scalar):
         self.input = [x]
         self.scalar = scalar
+        self.saved_versions = [x._version]
 
     def backward(self, gradient):
+        for t, v in zip(self.input, self.saved_versions):
+            if t._version != v:
+                raise RuntimeError("one of the variables needed for gradient computation has been modified by an in-place operation")
         return [gradient * self.scalar]
 
 
@@ -46,8 +54,13 @@ class SumBackward:
     def __init__(self, x, axis=None):
         self.input = [x]
         self.axis = axis
+        self.saved_versions = [x._version]
 
     def backward(self, gradient):
+        for t, v in zip(self.input, self.saved_versions):
+            if t._version != v:
+                raise RuntimeError("one of the variables needed for gradient computation has been modified by an in-place operation")
+
         if self.axis is None:
             # If axis is None, sum reduces the tensor to a scalar.
             grad_output = Tensor(gradient.data * np.ones_like(self.input[0].data))
@@ -63,6 +76,7 @@ class Tensor:
         self.grad = None
         self.grad_fn = grad_fn if requires_grad else None
         self.data = data if isinstance(data, np.ndarray) else np.array(data)
+        self._version = 0
 
     def is_non_leaf(self):
         return self.grad_fn is not None
@@ -85,6 +99,11 @@ class Tensor:
         if self.grad is not None:
             repr += f'grad={self.grad}, '
         return repr.rstrip(' ,') + ')'
+
+    def __iadd__(self, other):
+        self.data += other.data if isinstance(other, Tensor) else other
+        self._version += 1
+        return self
 
     def __add__(self, other):
         should_track = (self.requires_grad or other.requires_grad) and _grad_enabled
@@ -184,6 +203,18 @@ def test_backward(t1):
     print('-' * 80)
 
 
+def test_backward_with_inplace_check():
+    x = Tensor(np.array([1.0, 2.0]), requires_grad=True)
+    y = x * 2
+    # Modify x in-place. This should increment x._version
+    x += 1.0
+    try:
+        breakpoint()
+        y.backward()
+    except RuntimeError:
+        print('in-place modification detected')
+
+
 def test_no_grad_context():
     print("Testing no_grad context:")
     x = Tensor([1.0], requires_grad=True)
@@ -218,12 +249,14 @@ def test_detach():
 
 
 if __name__ == "__main__":
-    t1 = Tensor([1, 2.1], requires_grad=True)
-    test_backward(t1)
-    import torch
-    t1 = torch.tensor([1, 2.1], requires_grad=True)
-    test_backward(t1)
+    #t1 = Tensor([1, 2.1], requires_grad=True)
+    #test_backward(t1)
+    #import torch
+    #t1 = torch.tensor([1, 2.1], requires_grad=True)
+    #test_backward(t1)
 
-    test_no_grad_context()
+    test_backward_with_inplace_check()
 
-    test_detach()
+    #test_no_grad_context()
+
+    #test_detach()
