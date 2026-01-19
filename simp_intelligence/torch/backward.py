@@ -138,7 +138,12 @@ class Tensor:
         if not self.requires_grad:
             # requires_grad decides where the backward pass stops
             return
-        elif gradient is not None and gradient.data.ndim != 0:
+
+        if gradient is None:
+            if self.data.ndim != 0:
+                raise RuntimeError("gradient can be implicit only for scalar outputs")
+            gradient = Tensor(1.0)
+        elif gradient.data.ndim != 0:
             # this toy code only handles a scalar gradient, in reality, pytorch allows
             # calling .backward() on non-scalar tensors using a Vector-Jacobian product.
             raise NotImplementedError
@@ -205,13 +210,13 @@ def test_backward(t1):
 
 def test_backward_with_inplace_check():
     x = Tensor(np.array([1.0, 2.0]), requires_grad=True)
-    y = x * 2
+    y = (x * 2).sum()
     # Modify x in-place. This should increment x._version
     x += 1.0
     try:
-        breakpoint()
         y.backward()
-    except RuntimeError:
+    except RuntimeError as e:
+        assert 'in-place' in str(e)
         print('in-place modification detected')
 
 
