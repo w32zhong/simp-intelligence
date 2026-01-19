@@ -28,16 +28,21 @@ class AddBackward:
         # ctx.save_for_backward(x). Here we just store as Backward "input" for simplicity,
         # of course, this only works if backward() always happens in the same context.
         self.input = [x, y]
-        self.saved_versions = [x._version, y._version]
 
     def backward(self, gradient):
-        for t, v in zip(self.input, self.saved_versions):
-            if t._version != v:
-                raise RuntimeError("one of the variables needed for gradient computation has been modified by an in-place operation")
         return [gradient, gradient]
 
 
 class ScalarMulBackward:
+    def __init__(self, x, scalar):
+        self.input = [x]
+        self.scalar = scalar
+
+    def backward(self, gradient):
+        return [gradient * self.scalar]
+
+
+class ScalarPowerBackward:
     def __init__(self, x, scalar):
         self.input = [x]
         self.scalar = scalar
@@ -46,21 +51,18 @@ class ScalarMulBackward:
     def backward(self, gradient):
         for t, v in zip(self.input, self.saved_versions):
             if t._version != v:
-                raise RuntimeError("one of the variables needed for gradient computation has been modified by an in-place operation")
-        return [gradient * self.scalar]
+                raise RuntimeError("one of the variables needed for gradient computation has been modified by an inplace operation.")
+
+        grad_output = Tensor(gradient.data * self.scalar * self.input[0].data * (self.scalar - 1))
+        return [grad_output]
 
 
 class SumBackward:
     def __init__(self, x, axis=None):
         self.input = [x]
         self.axis = axis
-        self.saved_versions = [x._version]
 
     def backward(self, gradient):
-        for t, v in zip(self.input, self.saved_versions):
-            if t._version != v:
-                raise RuntimeError("one of the variables needed for gradient computation has been modified by an in-place operation")
-
         if self.axis is None:
             # If axis is None, sum reduces the tensor to a scalar.
             grad_output = Tensor(gradient.data * np.ones_like(self.input[0].data))
@@ -101,6 +103,8 @@ class Tensor:
         return repr.rstrip(' ,') + ')'
 
     def __iadd__(self, other):
+        if not self.is_non_leaf() and self.requires_grad:
+            raise RuntimeError("a leaf Variable that requires grad is being used in an in-place operation.")
         self.data += other.data if isinstance(other, Tensor) else other
         self._version += 1
         return self
@@ -121,6 +125,16 @@ class Tensor:
             self.data * other,
             requires_grad=should_track,
             grad_fn=ScalarMulBackward(self, other) if should_track else None
+        )
+
+    def __pow__(self, other):
+        if not isinstance(other, (int, float)):
+            raise NotImplementedError
+        should_track = self.requires_grad and _grad_enabled
+        return Tensor(
+            self.data ** other,
+            requires_grad=should_track,
+            grad_fn=ScalarPowerBackward(self, other) if should_track else None
         )
 
     def sum(self, axis=None):
@@ -182,7 +196,14 @@ class Tensor:
                     gradient_dict[u].append(grad)
 
 
-def test_backward(t1):
+def test_backward_simple(t1):
+    t2 = t1 ** 2
+    t3 = t2.sum()
+    t3.backward()
+    print('t1.grad', t1.grad)
+
+
+def test_backward_diamond(t1):
     #         x2         x3
     # tensor1 -- tensor2 -- tensor3 -+ tensor5
     #       \__x4___ tensor4 _______/
@@ -208,16 +229,28 @@ def test_backward(t1):
     print('-' * 80)
 
 
-def test_backward_with_inplace_check():
-    x = Tensor(np.array([1.0, 2.0]), requires_grad=True)
-    y = (x * 2).sum()
-    # Modify x in-place. This should increment x._version
-    x += 1.0
+def test_leaf_with_inplace_check(x):
     try:
-        y.backward()
+        x += 1.0
     except RuntimeError as e:
+        print(e)
         assert 'in-place' in str(e)
-        print('in-place modification detected')
+        return
+    assert False
+
+
+def test_backward_with_inplace_check(x):
+    x = x + x # this is okay, not in-place in the terms of memory overwrites
+    y = x ** 2
+    z = y.sum()
+    x += 1 # this is going to cause trouble
+    try:
+        z.backward()
+    except RuntimeError as e:
+        print(e)
+        assert 'inplace' in str(e)
+        return
+    assert False
 
 
 def test_no_grad_context():
@@ -254,14 +287,24 @@ def test_detach():
 
 
 if __name__ == "__main__":
-    #t1 = Tensor([1, 2.1], requires_grad=True)
-    #test_backward(t1)
-    #import torch
-    #t1 = torch.tensor([1, 2.1], requires_grad=True)
-    #test_backward(t1)
+    import torch
 
-    test_backward_with_inplace_check()
+    for impl in [Tensor, torch.tensor]:
+        t1 = impl([1, 2.1], requires_grad=True)
+        test_backward_simple(t1)
 
-    #test_no_grad_context()
+    for impl in [Tensor, torch.tensor]:
+        t1 = impl([1, 2.1], requires_grad=True)
+        test_backward_diamond(t1)
 
-    #test_detach()
+    for impl in [Tensor, torch.tensor]:
+        t1 = impl([1.0, 2.0], requires_grad=True)
+        test_leaf_with_inplace_check(t1)
+
+    for impl in [Tensor, torch.tensor]:
+        t1 = impl([1.0, 2.0], requires_grad=True)
+        test_backward_with_inplace_check(t1)
+
+    test_no_grad_context()
+
+    test_detach()
