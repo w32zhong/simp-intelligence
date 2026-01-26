@@ -43,7 +43,7 @@ class Layout:
                 self.visualize_2D(axes[i], indices, color_map)
         elif len(self.shape) == 2:
             fig, ax = plt.subplots()
-            self.visualize_2D(ax, *self.shape, color_map)
+            self.visualize_2D(ax, self.indices(), color_map)
         else:
             raise NotImplementedError
         plt.tight_layout()
@@ -98,11 +98,16 @@ class Layout:
         ax.set_aspect("equal")
         ax.axis("off")
 
+    def permute(self, *dims):
+        new_shape = tuple(self.shape[d] for d in dims)
+        new_stride = tuple(self.stride[d] for d in dims)
+        return Layout(new_shape, new_stride)
+
 
 if __name__ == "__main__":
     layout = Layout(shape=(3, 2, 8), stride=(16, 8, 1))
     layout.visualize()
     plt.show()
-    layout.permute(1, 2, 0)
+    layout = layout.permute(1, 2, 0)
     layout.visualize()
     plt.show()
