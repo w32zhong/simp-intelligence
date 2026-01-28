@@ -104,10 +104,44 @@ class Layout:
         return Layout(new_shape, new_stride)
 
 
+def latex_doc(tikz_str):
+    return r"""\documentclass{article}
+    \usepackage{tikz}
+    \newcommand{\mapArrow}[2]{\draw[maparrow] (#1) -- (#2);}
+    \begin{document}
+    """ + tikz_str + "\n\\end{document}"
+    #tikz_str = tract.layout_to_tikz(layout)
+    #print(latex_doc(tikz_str))
+
+
 if __name__ == "__main__":
-    layout = Layout(shape=(3, 2, 8), stride=(16, 8, 1))
-    layout.visualize()
-    plt.show()
-    layout = layout.permute(1, 2, 0)
-    layout.visualize()
-    plt.show()
+    import sys
+    sys.path.insert(0, 'tract/src')
+
+    import tract
+    import cutlass.cute as cute
+    @cute.jit
+    def test():
+        A = cute.make_layout(shape=((4,4),4), stride=((16,1),4))
+        B = cute.make_layout(shape=(8,64), stride=(64,1))
+        B_o_A = cute.composition(B, A)
+        print(B_o_A) # ((4,4),(2,2)):((2,64),(256,1))
+
+        assert tract.is_tractable(A)
+        assert tract.is_tractable(B)
+        morphism_A = tract.compute_morphism(A)
+        morphism_B = tract.compute_morphism(B)
+        print(morphism_A)
+        print(morphism_B)
+        morphism_B_o_A = tract.weak_composite(morphism_A, morphism_B)
+        tract_B_o_A = tract.compute_layout(morphism_B_o_A)
+        print(tract_B_o_A)
+
+    test()
+
+    #layout = Layout(shape=(3, 2, 8), stride=(16, 8, 1))
+    #layout.visualize()
+    #plt.show()
+    #layout = layout.permute(1, 2, 0)
+    #layout.visualize()
+    #plt.show()
