@@ -105,9 +105,6 @@ class Layout:
 
 
 if __name__ == "__main__":
-    import sys
-    sys.path.insert(0, 'tract/src')
-
     import cutlass.cute as cute
     @cute.jit
     def test():
@@ -115,14 +112,10 @@ if __name__ == "__main__":
         tiler = cute.make_layout(shape=(3, 2), stride=(1, 3))
         composed = cute.composition(base, tiler)
         print(composed) # (3,2):(8,24)
-    test()
 
-    base = Layout(shape=(6, 8), stride=(8, 1))
-    tiler = Layout(shape=(3, 2), stride=(1, 3))
-    composed = Layout(shape=(3, 2), stride=(8, 24))
-    base.visualize()
-    plt.show()
-    tiler.visualize()
-    plt.show()
-    composed.visualize()
-    plt.show()
+        base = cute.make_layout(shape=(6, 2), stride=(8, 2))
+        tiler = cute.make_layout(shape=(4, 3), stride=(3, 1))
+        composed = cute.composition(base, tiler)
+        print(composed) # ((2,2),3):((24,2),8)
+
+    test()
