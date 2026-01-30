@@ -1,5 +1,6 @@
 import ast
 import matplotlib.pyplot as plt
+from functools import reduce
 
 
 def default_color_map(index):
@@ -7,9 +8,9 @@ def default_color_map(index):
     return colors[index % len(colors)]
 
 
-def product(_tuple):
+def cartesian_product(_tuple):
     if not isinstance(_tuple, tuple):
-        return _tuple
+        return [(_tuple,)]
     pools = []
     for _set in _tuple:
         if isinstance(_set, tuple):
@@ -20,6 +21,15 @@ def product(_tuple):
     for pool in pools:
         result = [x + [y] for x in result for y in pool]
     return [tuple(r) for r in result]
+
+
+def product(_tuple):
+    if not isinstance(_tuple, tuple):
+        return _tuple
+    prod = 1
+    for elem in _tuple:
+        prod *= product(elem)
+    return prod
 
 
 def prefix_product(_tuple, init=1):
@@ -71,16 +81,50 @@ class Layout:
     def __repr__(self):
         return f'{self.shape}:{self.stride}'
 
-    def crd2idx(self, coordinates):
-        offset = 0
-        for c, s in zip(coordinates, self.stride):
-            offset += c * s
-        return offset
+    def __getitem__(self, i):
+        if isinstance(self.shape, tuple):
+            return Layout(self.shape[i], self.stride[i])
+        else:
+            assert i == 0
+            return Layout(self.shape, self.stride)
+
+    def size(self): # Size of the domain
+        return product(self.shape)
+
+    def crd2idx(self, crd):
+        if isinstance(crd, tuple):
+            assert len(crd) == len(self.shape)
+            offset = 0
+            for c, s, d in zip(crd, self.shape, self.stride):
+                offset += Layout(s, d).crd2idx(c)
+            return offset
+        else:
+            return crd * self.stride
+
+    @staticmethod
+    def max_coordinates(shape):
+        if isinstance(shape, int):
+            return shape - 1
+        elif isinstance(shape, tuple):
+            return tuple(Layout.max_coordinates(s) for s in shape)
+        else:
+            raise TypeError(f"Unsupported type: {type(shape)}")
+
+    def cosize(self): # Size of the codomain
+        max_crd = Layout.max_coordinates(self.shape)
+        return self.crd2idx(max_crd) + 1
+
+    def idx2crd(self, idx):
+        if isinstance(self.shape, tuple):
+            assert len(self.shape) == len(self.stride)
+            return tuple(Layout(s, d).idx2crd(idx) for s, d in zip(self.shape, self.stride))
+        else:
+            return (idx // self.stride) % self.shape
 
     def coordinates(self, shape=None, prefix_crd=tuple()):
         if shape is None:
             shape = self.shape
-        return product(prefix_crd + tuple(tuple(range(s)) for s in shape))
+        return cartesian_product(prefix_crd + tuple(tuple(range(s)) for s in shape))
 
     def visualize(self, color_map=default_color_map):
         if len(self.shape) == 3:
@@ -166,6 +210,18 @@ if __name__ == "__main__":
     #    print(composed) # ((2,2),3):((24,2),8)
     #test()
 
+    print(cartesian_product(
+        (2, (3, 4), (5, (6, 8)))
+    ))
+
+    print(product(
+        (2, (3, 4), (5, (6, 8)))
+    ))
+
+    print(prefix_product(
+        (2, (3, 4, 2), (5, (6, 8), 6))
+    ))
+
     l1 = Layout(shape=(2, 3, 4))
     print(l1)
     print(list(l1.coordinates()))
@@ -173,8 +229,18 @@ if __name__ == "__main__":
     l1.visualize()
     #plt.show()
 
-    print(Layout.from_string('(8, 2):(1, 8)'))
-    print(Layout.from_string('8,1'))
+    l2 = Layout.from_string('2,8')
+    print(l2, l2.idx2crd(7))
 
-    l2 = Layout.from_string('((4, 2),):((1, 4),)')
-    print(l2)
+    l3 = Layout.from_string('(8, 2):(2, 1)')
+    for idx in range(l3.size()):
+        print(idx, '->', l3.idx2crd(idx), end=', ')
+    print()
+
+    l4 = Layout.from_string('((4, 2),):((1, 4),)')
+    print(l4[0])
+
+    # sparse layout => size !=  cosize
+    l5 = Layout.from_string('((3, 3), 4):((1, 3), 10)')
+    print(Layout.max_coordinates(l5.shape))
+    print(l5.size(), l5.cosize())
