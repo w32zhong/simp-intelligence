@@ -1,3 +1,4 @@
+import ast
 import matplotlib.pyplot as plt
 
 
@@ -40,6 +41,32 @@ class Layout:
     def __init__(self, shape, stride=None):
         self.shape = shape
         self.stride = prefix_product(shape) if stride is None else stride
+
+    @classmethod
+    def from_string(cls, string):
+        def _find_top_level_colon(s):
+            depth = 0
+            for i, c in enumerate(s):
+                if c == '(':
+                    depth += 1
+                elif c == ')':
+                    depth -= 1
+                elif c == ':' and depth == 0:
+                    return i
+            return -1
+
+        def _recurr(s):
+            s = s.strip()
+            colon = _find_top_level_colon(s)
+            if colon != -1:
+                return cls(ast.literal_eval(s[:colon]), ast.literal_eval(s[colon+1:]))
+
+            if s.startswith('(') and s.endswith(')'):
+                return _recurr(s[1:-1])
+            else:
+                return cls(ast.literal_eval(s))
+
+        return _recurr(string)
 
     def __repr__(self):
         return f'{self.shape}:{self.stride}'
@@ -144,4 +171,10 @@ if __name__ == "__main__":
     print(list(l1.coordinates()))
     print(l1.permute(2, 0, 1))
     l1.visualize()
-    plt.show()
+    #plt.show()
+
+    print(Layout.from_string('(8, 2):(1, 8)'))
+    print(Layout.from_string('8,1'))
+
+    l2 = Layout.from_string('((4, 2),):((1, 4),)')
+    print(l2)
