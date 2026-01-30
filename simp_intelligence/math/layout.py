@@ -121,32 +121,46 @@ class Layout:
         else:
             return (idx // self.stride) % self.shape
 
-    def coordinates(self, shape=None, prefix_crd=tuple()):
-        if shape is None:
-            shape = self.shape
-        return cartesian_product(prefix_crd + tuple(tuple(range(s)) for s in shape))
-
     def visualize(self, color_map=default_color_map):
         if len(self.shape) == 3:
-            fig, axes = plt.subplots(self.shape[0])
-            for i in range(self.shape[0]):
-                i_crds = self.coordinates(prefix_crd=(i,), shape=self.shape[1:])
-                self.visualize_2D(axes[i], i_crds, color_map)
-        elif len(self.shape) == 2:
+            fig, axes = plt.subplots(self[0].size())
+            for idx in range(self[0].size()):
+                self.visualize_2D_or_1D(axes[idx], idx, color_map)
+        elif len(self.shape) in [2, 1]:
             fig, ax = plt.subplots()
-            self.visualize_2D(ax, self.coordinates(), color_map)
+            self.visualize_2D_or_1D(ax, None, color_map)
         else:
             raise NotImplementedError
         plt.tight_layout()
 
-    def visualize_2D(self, ax, crds, color_map):
-        M, N = self.shape[-2], self.shape[-1]
-        for crd in crds:
+    def visualize_2D_or_1D(self, ax, z, color_map):
+        is_1D = (len(self.shape) == 1)
+        N = self[-1].size()
+        if is_1D:
+            M = 1
+            _2D = Layout(shape=(1, self.shape[-1]))
+            _2D_flat = Layout((1, self[-1].size()))
+        else:
+            M = self[-2].size()
+            _2D = Layout(shape=self.shape[-2:])
+            _2D_flat = Layout((self[-2].size(), self[-1].size()))
+
+        m_axis_ticks = dict()
+        n_axis_ticks = dict()
+        for _2D_idx in range(_2D.size()):
+            _2D_crd = _2D.idx2crd(_2D_idx)
+            if z is None:
+                crd = self.idx2crd(_2D_idx) if is_1D else _2D_crd
+            else:
+                crd = (z, *_2D_crd)
             offset = self.crd2idx(crd)
             color = color_map(offset)
             label = f'{offset}'
 
-            m, n = crd[-2], crd[-1]
+            _2D_crd_flat = _2D_flat.idx2crd(_2D_idx)
+            m, n = _2D_crd_flat[-2], _2D_crd_flat[-1]
+            m_axis_ticks[m] = 0 if is_1D else crd[-2]
+            n_axis_ticks[n] = crd[-1]
             rect = plt.Rectangle(
                 (n, M - m - 1), 1, 1,
                 facecolor=color,
@@ -165,7 +179,7 @@ class Layout:
             ax.text(
                 -0.3,
                 M - m - 0.5,
-                str(m),
+                str(m_axis_ticks[m]),
                 ha="center",
                 va="center",
                 fontsize=14,
@@ -177,7 +191,7 @@ class Layout:
             ax.text(
                 n + 0.5,
                 M + 0.3,
-                str(n),
+                str(n_axis_ticks[n]),
                 ha="center",
                 va="center",
                 fontsize=14,
@@ -223,11 +237,9 @@ if __name__ == "__main__":
     ))
 
     l1 = Layout(shape=(2, 3, 4))
-    print(l1)
-    print(list(l1.coordinates()))
-    print(l1.permute(2, 0, 1))
     l1.visualize()
-    #plt.show()
+
+    l1.permute(2, 0, 1).visualize()
 
     l2 = Layout.from_string('2,8')
     print(l2, l2.idx2crd(7))
@@ -238,9 +250,16 @@ if __name__ == "__main__":
     print()
 
     l4 = Layout.from_string('((4, 2),):((1, 4),)')
-    print(l4[0])
+    print(l4, l4.shape)
+    l4.visualize()
+
+    l5 = Layout.from_string('(2,2),(2,2):(1,4),(2,8)')
+    print(l5, l5.shape)
+    l5.visualize()
 
     # sparse layout => size !=  cosize
-    l5 = Layout.from_string('((3, 3), 4):((1, 3), 10)')
-    print(Layout.max_coordinates(l5.shape))
-    print(l5.size(), l5.cosize())
+    l6 = Layout.from_string('((3, 3), 4):((1, 3), 10)')
+    print(Layout.max_coordinates(l6.shape))
+    print(l6.size(), l6.cosize())
+
+    plt.show()
