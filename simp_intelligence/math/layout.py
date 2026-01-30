@@ -1,6 +1,3 @@
-# Reference: https://github.com/HanGuo97/hilt/blob/main/hilt/pycute_utils.py
-import math
-import itertools
 import matplotlib.pyplot as plt
 
 
@@ -9,53 +6,76 @@ def default_color_map(index):
     return colors[index % len(colors)]
 
 
+def product(_tuple):
+    if not isinstance(_tuple, tuple):
+        return _tuple
+    pools = []
+    for _set in _tuple:
+        if isinstance(_set, tuple):
+            pools.append(_set)
+        else:
+            pools.append((_set,))
+    result = [[]]
+    for pool in pools:
+        result = [x + [y] for x in result for y in pool]
+    return [tuple(r) for r in result]
+
+
+def prefix_product(_tuple, init=1):
+    if isinstance(_tuple, tuple):
+        if isinstance(init, tuple):
+            assert len(_tuple) == len(init)
+            return tuple(prefix_product(x, i) for x, i in zip(_tuple, init))
+        else:
+            r = []
+            for v in _tuple:
+                r.append(prefix_product(v, init))
+                init = init * product(v)
+            return tuple(r)
+    else:
+        return init
+
+
 class Layout:
-    def __init__(self, shape, stride):
+    def __init__(self, shape, stride=None):
         self.shape = shape
-        self.stride = stride
+        self.stride = prefix_product(shape) if stride is None else stride
 
     def __repr__(self):
         return f'{self.shape}:{self.stride}'
 
-    def __getitem__(self, index):
+    def crd2idx(self, coordinates):
         offset = 0
-        for i, s in zip(index, self.stride):
-            offset += i * s
+        for c, s in zip(coordinates, self.stride):
+            offset += c * s
         return offset
 
-    def indices(self):
-        # Product Reference
-        #def product(*args):
-        #    pools = [tuple(pool) for pool in args]
-        #    result = [[]]
-        #    for pool in pools:
-        #        result = [x + [y] for x in result for y in pool]
-        #    for prod in result:
-        #        yield tuple(prod)
-        for idx in itertools.product(*[range(d) for d in self.shape]):
-            yield idx
+    def coordinates(self, shape=None, prefix_crd=tuple()):
+        if shape is None:
+            shape = self.shape
+        return product(prefix_crd + tuple(tuple(range(s)) for s in shape))
 
     def visualize(self, color_map=default_color_map):
         if len(self.shape) == 3:
             fig, axes = plt.subplots(self.shape[0])
             for i in range(self.shape[0]):
-                indices = itertools.product((i, ), *[range(d) for d in self.shape[1:]])
-                self.visualize_2D(axes[i], indices, color_map)
+                i_crds = self.coordinates(prefix_crd=(i,), shape=self.shape[1:])
+                self.visualize_2D(axes[i], i_crds, color_map)
         elif len(self.shape) == 2:
             fig, ax = plt.subplots()
-            self.visualize_2D(ax, self.indices(), color_map)
+            self.visualize_2D(ax, self.coordinates(), color_map)
         else:
             raise NotImplementedError
         plt.tight_layout()
 
-    def visualize_2D(self, ax, indices, color_map):
+    def visualize_2D(self, ax, crds, color_map):
         M, N = self.shape[-2], self.shape[-1]
-        for idx in indices:
-            offset = self[idx]
+        for crd in crds:
+            offset = self.crd2idx(crd)
             color = color_map(offset)
             label = f'{offset}'
 
-            m, n = idx[-2], idx[-1]
+            m, n = crd[-2], crd[-1]
             rect = plt.Rectangle(
                 (n, M - m - 1), 1, 1,
                 facecolor=color,
@@ -69,7 +89,7 @@ class Layout:
                 fontsize=12, fontweight="bold", color="black"
             )
 
-        # Add row labels (m indices) - positioned to the left
+        # Add row labels
         for m in range(M):
             ax.text(
                 -0.3,
@@ -81,7 +101,7 @@ class Layout:
                 fontweight="bold",
             )
 
-        # Add column labels (n indices) - positioned at the top
+        # Add column labels
         for n in range(N):
             ax.text(
                 n + 0.5,
@@ -105,17 +125,23 @@ class Layout:
 
 
 if __name__ == "__main__":
-    import cutlass.cute as cute
-    @cute.jit
-    def test():
-        base = cute.make_layout(shape=(6, 8), stride=(8, 1))
-        tiler = cute.make_layout(shape=(3, 2), stride=(1, 3))
-        composed = cute.composition(base, tiler)
-        print(composed) # (3,2):(8,24)
+    #import cutlass.cute as cute
+    #@cute.jit
+    #def test():
+    #    base = cute.make_layout(shape=(6, 8), stride=(8, 1))
+    #    tiler = cute.make_layout(shape=(3, 2), stride=(1, 3))
+    #    composed = cute.composition(base, tiler)
+    #    print(composed) # (3,2):(8,24)
 
-        base = cute.make_layout(shape=(6, 2), stride=(8, 2))
-        tiler = cute.make_layout(shape=(4, 3), stride=(3, 1))
-        composed = cute.composition(base, tiler)
-        print(composed) # ((2,2),3):((24,2),8)
+    #    base = cute.make_layout(shape=(6, 2), stride=(8, 2))
+    #    tiler = cute.make_layout(shape=(4, 3), stride=(3, 1))
+    #    composed = cute.composition(base, tiler)
+    #    print(composed) # ((2,2),3):((24,2),8)
+    #test()
 
-    test()
+    l1 = Layout(shape=(2, 3, 4))
+    print(l1)
+    print(list(l1.coordinates()))
+    print(l1.permute(2, 0, 1))
+    l1.visualize()
+    plt.show()
