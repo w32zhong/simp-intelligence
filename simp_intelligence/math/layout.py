@@ -171,7 +171,7 @@ class Layout:
             ax.text(
                 n + 0.5, M - m - 0.5, label,
                 ha="center", va="center",
-                fontsize=12, fontweight="bold", color="black"
+                fontsize=8, fontweight="bold", color="black"
             )
 
         # Add row labels
@@ -180,9 +180,9 @@ class Layout:
                 -0.3,
                 M - m - 0.5,
                 str(m_axis_ticks[m]),
-                ha="center",
+                ha="right",
                 va="center",
-                fontsize=14,
+                fontsize=8,
                 fontweight="bold",
             )
 
@@ -193,8 +193,9 @@ class Layout:
                 M + 0.3,
                 str(n_axis_ticks[n]),
                 ha="center",
-                va="center",
-                fontsize=14,
+                va="bottom",
+                fontsize=8,
+                rotation=45,
                 fontweight="bold",
             )
 
@@ -261,5 +262,8 @@ if __name__ == "__main__":
     l6 = Layout.from_string('((3, 3), 4):((1, 3), 10)')
     print(Layout.max_coordinates(l6.shape))
     print(l6.size(), l6.cosize())
+
+    l7 = Layout.from_string('((2, (2, 2)), (2, (2, 2))):((1, (4, 16)), (2, (8, 32)))')
+    l7.visualize()
 
     plt.show()
