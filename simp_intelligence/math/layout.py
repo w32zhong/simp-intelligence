@@ -48,6 +48,16 @@ def prefix_product(_tuple, init=1):
         return init
 
 
+def flat(t):
+    if isinstance(t, tuple):
+        if len(t) == 0:
+            return ()
+        else:
+            return tuple(ttt for tt in t for ttt in flat(tt))
+    else:
+        return (t,)
+
+
 class Layout:
     def __init__(self, shape, stride=None):
         self.shape = shape
@@ -98,7 +108,6 @@ class Layout:
         if isinstance(self.shape, tuple):
             return Layout(self.shape[i], self.stride[i])
         else:
-            assert i == 0
             return Layout(self.shape, self.stride)
 
     def size(self): # Size of the domain
@@ -106,7 +115,6 @@ class Layout:
 
     def crd2idx(self, crd):
         if isinstance(crd, tuple):
-            assert len(crd) == len(self.shape)
             offset = 0
             for c, s, d in zip(crd, self.shape, self.stride):
                 offset += Layout(s, d).crd2idx(c)
@@ -129,17 +137,16 @@ class Layout:
 
     def idx2crd(self, idx):
         if isinstance(self.shape, tuple):
-            assert len(self.shape) == len(self.stride)
             return tuple(Layout(s, d).idx2crd(idx) for s, d in zip(self.shape, self.stride))
         else:
             return (idx // self.stride) % self.shape
 
     def visualize(self, color_map=default_color_map):
-        if len(self.shape) == 3:
+        if len(self) == 3:
             fig, axes = plt.subplots(self[0].size())
             for idx in range(self[0].size()):
                 self.visualize_2D_or_1D(axes[idx], idx, color_map)
-        elif len(self.shape) in [2, 1]:
+        elif len(self) in [2, 1]:
             fig, ax = plt.subplots()
             self.visualize_2D_or_1D(ax, None, color_map)
         else:
@@ -147,15 +154,15 @@ class Layout:
         plt.tight_layout()
 
     def visualize_2D_or_1D(self, ax, z, color_map):
-        is_1D = (len(self.shape) == 1)
+        is_1D = (len(self) == 1)
         N = self[-1].size()
         if is_1D:
             M = 1
-            _2D = Layout(shape=(1, self.shape[-1]))
+            _2D = Layout(shape=(1, self[-1].shape))
             _2D_flat = Layout((1, self[-1].size()))
         else:
             M = self[-2].size()
-            _2D = Layout(shape=self.shape[-2:])
+            _2D = Layout(shape=self[-2:].shape)
             _2D_flat = Layout((self[-2].size(), self[-1].size()))
 
         m_axis_ticks = dict()
@@ -173,7 +180,7 @@ class Layout:
             _2D_crd_flat = _2D_flat.idx2crd(_2D_idx)
             m, n = _2D_crd_flat[-2], _2D_crd_flat[-1]
             m_axis_ticks[m] = 0 if is_1D else crd[-2]
-            n_axis_ticks[n] = crd[-1]
+            n_axis_ticks[n] = crd[-1] if isinstance(crd, tuple) else crd
             rect = plt.Rectangle(
                 (n, M - m - 1), 1, 1,
                 facecolor=color,
@@ -231,7 +238,7 @@ class Layout:
             result_stride = []
             remain_shape = other.shape
             remain_stride = other.stride
-            for cur_shape, cur_stride in zip(self.shape[:-1], self.stride[:-1]):
+            for cur_shape, cur_stride in zip(flat(self.shape)[:-1], flat(self.stride)[:-1]):
                 # Example   A_shape:A_stride / B_stride
                 #         = (3,6,2,8):(w,x,y,z) / 72
                 #         = (ceil[3/72], ceil[6/24], ceil[2/4], ceil[8/2]):(72w, 24x, 4x, 2z)
@@ -247,8 +254,12 @@ class Layout:
                 result_stride.append(new_stride)
 
             result_shape.append(remain_shape)
-            result_stride.append(remain_stride * self.stride[-1])
-            return Layout(tuple(result_shape), tuple(result_stride))
+            result_stride.append(remain_stride * flat(self.stride)[-1])
+
+            if len(result_shape) == 1:
+                return Layout(result_shape[0], result_stride[0])
+            else:
+                return Layout(tuple(result_shape), tuple(result_stride))
 
 
 if __name__ == "__main__":
@@ -313,7 +324,9 @@ if __name__ == "__main__":
     #print(composed)
     #A.visualize(); B.visualize(); composed.visualize()
 
-    #A = Layout.from_string('20:2')
+    A = Layout.from_string('20:2')
+    print(A)
+    A.visualize()
     #B = Layout.from_string('(5,4):(4,1)')
     #composed = A.composite(B)
     #print(composed)
@@ -325,10 +338,10 @@ if __name__ == "__main__":
     #print(composed)
     #A.visualize(); B.visualize(); composed.visualize()
 
-    A = Layout.from_string('(12, (4, 8)):(59, (13, 1))')
-    B = Layout.from_string('(3,4):(8,2)')
-    composed = A.composite(B)
-    print(composed)
-    A.visualize(); B.visualize(); composed.visualize()
+    #A = Layout.from_string('(12, (4, 8)):(59, (13, 1))')
+    #B = Layout.from_string('(3,4):(8,2)')
+    #composed = A.composite(B)
+    #print(composed)
+    #A.visualize(); B.visualize(); composed.visualize()
 
     plt.show()
