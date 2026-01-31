@@ -81,6 +81,12 @@ class Layout:
     def __repr__(self):
         return f'{self.shape}:{self.stride}'
 
+    def __len__(self):
+        if isinstance(self.shape, tuple):
+            return len(self.shape)
+        else:
+            return 1
+
     def __getitem__(self, i):
         if isinstance(self.shape, tuple):
             return Layout(self.shape[i], self.stride[i])
@@ -209,6 +215,34 @@ class Layout:
         new_stride = tuple(self.stride[d] for d in dims)
         return Layout(new_shape, new_stride)
 
+    def composite(self, other):
+        if isinstance(other.shape, tuple):
+            chain = list(self.composite(other_i) for other_i in other)
+            raise NotImplementedError
+        else:
+            result_shape = []
+            result_stride = []
+            remain_shape = other.shape
+            remain_stride = other.stride
+            for cur_shape, cur_stride in zip(self.shape[:-1], self.stride[:-1]):
+                # Example   A_shape:A_stride / B_stride
+                #         = (3,6,2,8):(w,x,y,z) / 72
+                #         = (ceil[3/72], ceil[6/24], ceil[2/4], ceil[8/2]):(72w, 24x, 4x, 2z)
+                #         = (1, 1, 1, 4):(72w, 24x, 4x, 2z)
+                new_shape = max(1, cur_shape // remain_stride) # "dividing out"
+                new_shape = min(new_shape, remain_shape) # "modding out"
+                new_stride = cur_stride * remain_stride
+
+                result_shape.append(new_shape)
+                result_stride.append(new_stride)
+
+                remain_shape = remain_shape // new_shape
+                remain_stride = math.ceil(remain_stride / cur_shape)
+
+            result_shape.append(remain_shape)
+            result_stride.append(remain_stride * self.stride[-1])
+            breakpoint()
+
 
 if __name__ == "__main__":
     #import cutlass.cute as cute
@@ -225,45 +259,49 @@ if __name__ == "__main__":
     #    print(composed) # ((2,2),3):((24,2),8)
     #test()
 
-    print(cartesian_product(
-        (2, (3, 4), (5, (6, 8)))
-    ))
+    #print(cartesian_product(
+    #    (2, (3, 4), (5, (6, 8)))
+    #))
 
-    print(product(
-        (2, (3, 4), (5, (6, 8)))
-    ))
+    #print(product(
+    #    (2, (3, 4), (5, (6, 8)))
+    #))
 
-    print(prefix_product(
-        (2, (3, 4, 2), (5, (6, 8), 6))
-    ))
+    #print(prefix_product(
+    #    (2, (3, 4, 2), (5, (6, 8), 6))
+    #))
 
-    l1 = Layout(shape=(2, 3, 4))
-    l1.visualize()
+    #l1 = Layout(shape=(2, 3, 4))
+    #l1.visualize()
 
-    l1.permute(2, 0, 1).visualize()
+    #l1.permute(2, 0, 1).visualize()
 
-    l2 = Layout.from_string('2,8')
-    print(l2, l2.idx2crd(7))
+    #l2 = Layout.from_string('2,8')
+    #print(l2, l2.idx2crd(7))
 
-    l3 = Layout.from_string('(8, 2):(2, 1)')
-    for idx in range(l3.size()):
-        print(idx, '->', l3.idx2crd(idx), end=', ')
-    print()
+    #l3 = Layout.from_string('(8, 2):(2, 1)')
+    #for idx in range(l3.size()):
+    #    print(idx, '->', l3.idx2crd(idx), end=', ')
+    #print()
 
-    l4 = Layout.from_string('((4, 2),):((1, 4),)')
-    print(l4, l4.shape)
-    l4.visualize()
+    #l4 = Layout.from_string('((4, 2),):((1, 4),)')
+    #print(l4, l4.shape)
+    #l4.visualize()
 
-    l5 = Layout.from_string('(2,2),(2,2):(1,4),(2,8)')
-    print(l5, l5.shape)
-    l5.visualize()
+    #l5 = Layout.from_string('(2,2),(2,2):(1,4),(2,8)')
+    #print(l5, l5.shape)
+    #l5.visualize()
 
-    # sparse layout => size !=  cosize
-    l6 = Layout.from_string('((3, 3), 4):((1, 3), 10)')
-    print(Layout.max_coordinates(l6.shape))
-    print(l6.size(), l6.cosize())
+    ## sparse layout => size !=  cosize
+    #l6 = Layout.from_string('((3, 3), 4):((1, 3), 10)')
+    #print(Layout.max_coordinates(l6.shape))
+    #print(l6.size(), l6.cosize())
 
-    l7 = Layout.from_string('((2, (2, 2)), (2, (2, 2))):((1, (4, 16)), (2, (8, 32)))')
-    l7.visualize()
+    #l7 = Layout.from_string('((2, (2, 2)), (2, (2, 2))):((1, (4, 16)), (2, (8, 32)))')
+    #l7.visualize()
 
-    plt.show()
+    #plt.show()
+
+    A = Layout.from_string('(6,2):(8,2)')
+    B = Layout.from_string('(4,3):(3,1)')
+    A.composite(B)
