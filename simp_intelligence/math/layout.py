@@ -178,35 +178,39 @@ class Layout:
             _2D_flat = Layout((self[-2].size(), self[-1].size()))
 
         m_axis_ticks, n_axis_ticks = dict(), dict()
-        for _2D_crd, _2D_flat_crd in zip(Layout.coordinates(_2D.shape), Layout.coordinates(_2D_flat.shape)):
-            if z is None:
-                crd = _2D_crd[-1] if is_1D else _2D_crd
-            else:
-                crd = (z, *_2D_crd)
+        for m in range(M):
+            for n in range(N):
+                idx = _2D_flat.crd2idx((m, n))
+                _2D_crd = _2D.idx2crd(idx)
 
-            if isinstance(crd, tuple) and len(crd) != len(self):
-                assert len(self) == 1
-                crd = (crd,)
+                if z is None:
+                    crd = _2D_crd[-1] if is_1D else _2D_crd
+                else:
+                    crd = (z, *_2D_crd)
 
-            offset = self.crd2idx(crd)
-            if debug: print(crd, '->', _2D_flat_crd, '->', offset)
-            color = color_map(offset)
-            label = f'{offset}'
-            m, n = _2D_flat_crd
-            m_axis_ticks[m] = 0 if is_1D else crd[-2]
-            n_axis_ticks[n] = crd[-1] if isinstance(crd, tuple) else crd
-            rect = plt.Rectangle(
-                (n, M - m - 1), 1, 1,
-                facecolor=color,
-                edgecolor="black",
-                linewidth=2,
-            )
-            ax.add_patch(rect)
-            ax.text(
-                n + 0.5, M - m - 0.5, label,
-                ha="center", va="center",
-                fontsize=8, fontweight="bold", color="black"
-            )
+                if isinstance(crd, tuple) and len(crd) != len(self):
+                    assert len(self) == 1
+                    crd = (crd,)
+
+                offset = self.crd2idx(crd)
+                if debug: print(crd, '->', (m, n), '->', offset)
+
+                color = color_map(offset)
+                label = f'{offset}'
+                m_axis_ticks[m] = 0 if is_1D else crd[-2]
+                n_axis_ticks[n] = crd[-1] if isinstance(crd, tuple) else crd
+                rect = plt.Rectangle(
+                    (n, M - m - 1), 1, 1,
+                    facecolor=color,
+                    edgecolor="black",
+                    linewidth=2,
+                )
+                ax.add_patch(rect)
+                ax.text(
+                    n + 0.5, M - m - 0.5, label,
+                    ha="center", va="center",
+                    fontsize=8, fontweight="bold", color="black"
+                )
 
         # Add row labels
         for m in range(M):
@@ -319,47 +323,44 @@ if __name__ == "__main__":
     l4 = Layout.from_string('((4, 2),):((1, 4),)')
     print(l4)
     print(tuple(Layout.coordinates(l4.shape)))
-    l4.visualize()
+    #l4.visualize()
 
-    #l5 = Layout.from_string('(2,2),(2,2):(1,4),(2,8)')
-    #print(l5, l5.shape)
+    l5 = Layout.from_string('(2,2),(2,2):(1,4),(2,8)')
+    print(l5, l5.shape)
     #l5.visualize()
 
-    ## sparse layout => size !=  cosize
-    #l6 = Layout.from_string('((3, 3), 4):((1, 3), 10)')
-    #print(tuple(Layout.coordinates(l6.shape)))
-    #print(Layout.max_coordinates(l6.shape))
-    #print(Layout.max_coordinates(l6.shape))
-    #print(l6.size(), l6.cosize())
+    # sparse layout => size !=  cosize
+    l6 = Layout.from_string('((3, 3), 4):((1, 3), 10)')
+    print(tuple(Layout.coordinates(l6.shape)))
+    print(Layout.max_coordinates(l6.shape))
+    print(Layout.max_coordinates(l6.shape))
+    print(l6.size(), l6.cosize())
 
-    #l7 = Layout.from_string('((2, (2, 2)), (2, (2, 2))):((1, (4, 16)), (2, (8, 32)))')
+    l7 = Layout.from_string('((2, (2, 2)), (2, (2, 2))):((1, (4, 16)), (2, (8, 32)))')
     #l7.visualize()
 
-    #A = Layout.from_string('(6,2):(8,2)')
-    #B = Layout.from_string('(4,3):(3,1)')
-    #composed = A.composite(B)
-    #print(composed)
+    A = Layout.from_string('(6,2):(8,2)')
+    B = Layout.from_string('(4,3):(3,1)')
+    composed = A.composite(B)
+    print(composed)
     #A.visualize(); B.visualize(); composed.visualize()
 
-    #A = Layout.from_string('20:2')
-    #print(A)
-    #A.visualize()
-
-    #B = Layout.from_string('(5,4):(4,1)')
-    #composed = A.composite(B)
-    #print(composed)
+    A = Layout.from_string('20:2')
+    B = Layout.from_string('(5,4):(4,1)')
+    composed = A.composite(B)
+    print(composed)
     #A.visualize(); B.visualize(); composed.visualize()
 
-    #A = Layout.from_string('(10,2):(16,4)')
-    #B = Layout.from_string('(5,4):(1,5)')
-    #composed = A.composite(B)
-    #print(composed)
+    A = Layout.from_string('(10,2):(16,4)')
+    B = Layout.from_string('(5,4):(1,5)')
+    composed = A.composite(B)
+    print(composed)
     #A.visualize(); B.visualize(); composed.visualize()
 
-    #A = Layout.from_string('(12, (4, 8)):(59, (13, 1))')
-    #B = Layout.from_string('(3,4):(8,2)')
-    #composed = A.composite(B)
-    #print(composed)
+    A = Layout.from_string('(12, (4, 8)):(59, (13, 1))')
+    B = Layout.from_string('(3,4):(8,2)')
+    composed = A.composite(B)
+    print(composed)
     #A.visualize(); B.visualize(); composed.visualize()
 
     plt.show()
