@@ -319,8 +319,14 @@ if __name__ == "__main__":
     #print(composed)
     #A.visualize(); B.visualize(); composed.visualize()
 
-    A = Layout.from_string('(10,2):(16,4)')
-    B = Layout.from_string('(5,4):(1,5)')
+    #A = Layout.from_string('(10,2):(16,4)')
+    #B = Layout.from_string('(5,4):(1,5)')
+    #composed = A.composite(B)
+    #print(composed)
+    #A.visualize(); B.visualize(); composed.visualize()
+
+    A = Layout.from_string('(12, (4, 8)):(59, (13, 1))')
+    B = Layout.from_string('(3,4):(8,2)')
     composed = A.composite(B)
     print(composed)
     A.visualize(); B.visualize(); composed.visualize()
