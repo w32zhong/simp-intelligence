@@ -247,9 +247,12 @@ class Layout:
         new_stride = tuple(self.stride[d] for d in dims)
         return Layout(new_shape, new_stride)
 
-    def composite(self, other):
+    def composite(self, other, by_mode=False):
         if isinstance(other.shape, tuple):
-            chain = list(self.composite(other_i) for other_i in other)
+            if by_mode:
+                chain = list(self[i].composite(other_i) for i, other_i in enumerate(other))
+            else:
+                chain = list(self.composite(other_i) for other_i in other)
             return Layout.from_chain(chain)
         else:
             result_shape = []
@@ -358,9 +361,15 @@ if __name__ == "__main__":
     #A.visualize(); B.visualize(); composed.visualize()
 
     A = Layout.from_string('(12, (4, 8)):(59, (13, 1))')
-    B = Layout.from_string('(3,4):(8,2)')
-    composed = A.composite(B)
+    B = Layout.from_string('(3,8):(4,2)')
+    composed = A.composite(B, by_mode=True)
     print(composed)
     #A.visualize(); B.visualize(); composed.visualize()
+
+    A = Layout.from_string('(12, (4, 8)):(59, (13, 1))')
+    B = Layout.from_string('(3,8):(1,1)')
+    composed = A.composite(B, by_mode=True)
+    print(composed)
+    A.visualize(); B.visualize(); composed.visualize()
 
     plt.show()
