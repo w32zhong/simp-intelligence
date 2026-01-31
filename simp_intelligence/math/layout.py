@@ -113,15 +113,6 @@ class Layout:
     def size(self): # Size of the domain
         return product(self.shape)
 
-    def crd2idx(self, crd):
-        if isinstance(crd, tuple):
-            offset = 0
-            for c, s, d in zip(crd, self.shape, self.stride):
-                offset += Layout(s, d).crd2idx(c)
-            return offset
-        else:
-            return crd * self.stride
-
     @staticmethod
     def max_coordinates(shape):
         if isinstance(shape, int):
@@ -130,6 +121,27 @@ class Layout:
             return tuple(Layout.max_coordinates(s) for s in shape)
         else:
             raise TypeError(f"Unsupported type: {type(shape)}")
+
+    @staticmethod
+    def coordinates(shape):
+        if isinstance(shape, int):
+            yield from range(shape)
+        elif isinstance(shape, tuple):
+            for c in cartesian_product(tuple(
+                tuple(Layout.coordinates(s)) for s in shape
+            )):
+                yield c
+        else:
+            raise TypeError(f"Unsupported type: {type(shape)}")
+
+    def crd2idx(self, crd):
+        if isinstance(crd, tuple):
+            offset = 0
+            for c, s, d in zip(crd, self.shape, self.stride):
+                offset += Layout(s, d).crd2idx(c)
+            return offset
+        else:
+            return crd * self.stride
 
     def cosize(self): # Size of the codomain
         max_crd = Layout.max_coordinates(self.shape)
@@ -153,7 +165,7 @@ class Layout:
             raise NotImplementedError
         plt.tight_layout()
 
-    def visualize_2D_or_1D(self, ax, z, color_map):
+    def visualize_2D_or_1D(self, ax, z, color_map, debug=False):
         is_1D = (len(self) == 1)
         N = self[-1].size()
         if is_1D:
@@ -165,20 +177,17 @@ class Layout:
             _2D = Layout(shape=self[-2:].shape)
             _2D_flat = Layout((self[-2].size(), self[-1].size()))
 
-        m_axis_ticks = dict()
-        n_axis_ticks = dict()
-        for _2D_idx in range(_2D.size()):
-            _2D_crd = _2D.idx2crd(_2D_idx)
+        m_axis_ticks, n_axis_ticks = dict(), dict()
+        for _2D_crd, _2D_flat_crd in zip(Layout.coordinates(_2D.shape), Layout.coordinates(_2D_flat.shape)):
             if z is None:
-                crd = self.idx2crd(_2D_idx) if is_1D else _2D_crd
+                crd = _2D_crd[-1] if is_1D else _2D_crd
             else:
                 crd = (z, *_2D_crd)
             offset = self.crd2idx(crd)
+            if debug: print(crd, '->', _2D_flat_crd, '->', offset)
             color = color_map(offset)
             label = f'{offset}'
-
-            _2D_crd_flat = _2D_flat.idx2crd(_2D_idx)
-            m, n = _2D_crd_flat[-2], _2D_crd_flat[-1]
+            m, n = _2D_flat_crd
             m_axis_ticks[m] = 0 if is_1D else crd[-2]
             n_axis_ticks[n] = crd[-1] if isinstance(crd, tuple) else crd
             rect = plt.Rectangle(
@@ -312,6 +321,8 @@ if __name__ == "__main__":
 
     ## sparse layout => size !=  cosize
     #l6 = Layout.from_string('((3, 3), 4):((1, 3), 10)')
+    #print(tuple(Layout.coordinates(l6.shape)))
+    #print(Layout.max_coordinates(l6.shape))
     #print(Layout.max_coordinates(l6.shape))
     #print(l6.size(), l6.cosize())
 
@@ -327,6 +338,7 @@ if __name__ == "__main__":
     A = Layout.from_string('20:2')
     print(A)
     A.visualize()
+
     #B = Layout.from_string('(5,4):(4,1)')
     #composed = A.composite(B)
     #print(composed)
