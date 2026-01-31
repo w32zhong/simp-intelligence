@@ -183,6 +183,11 @@ class Layout:
                 crd = _2D_crd[-1] if is_1D else _2D_crd
             else:
                 crd = (z, *_2D_crd)
+
+            if isinstance(crd, tuple) and len(crd) != len(self):
+                assert len(self) == 1
+                crd = (crd,)
+
             offset = self.crd2idx(crd)
             if debug: print(crd, '->', _2D_flat_crd, '->', offset)
             color = color_map(offset)
@@ -286,34 +291,35 @@ if __name__ == "__main__":
     #    print(composed) # ((2,2),3):((24,2),8)
     #test()
 
-    #print(cartesian_product(
-    #    (2, (3, 4), (5, (6, 8)))
-    #))
+    print(cartesian_product(
+        (2, (3, 4), (5, (6, 8)))
+    ))
 
-    #print(product(
-    #    (2, (3, 4), (5, (6, 8)))
-    #))
+    print(product(
+        (2, (3, 4), (5, (6, 8)))
+    ))
 
-    #print(prefix_product(
-    #    (2, (3, 4, 2), (5, (6, 8), 6))
-    #))
+    print(prefix_product(
+        (2, (3, 4, 2), (5, (6, 8), 6))
+    ))
 
-    #l1 = Layout(shape=(2, 3, 4))
+    l1 = Layout(shape=(2, 3, 4))
     #l1.visualize()
 
     #l1.permute(2, 0, 1).visualize()
 
-    #l2 = Layout.from_string('2,8')
-    #print(l2, l2.idx2crd(7))
+    l2 = Layout.from_string('2,8')
+    print(l2, l2.idx2crd(7))
 
-    #l3 = Layout.from_string('(8, 2):(2, 1)')
-    #for idx in range(l3.size()):
-    #    print(idx, '->', l3.idx2crd(idx), end=', ')
-    #print()
+    l3 = Layout.from_string('(8, 2):(2, 1)')
+    for crd in Layout.coordinates(l3.shape):
+        print(crd, '->', l3.crd2idx(crd), end=', ')
+    print()
 
-    #l4 = Layout.from_string('((4, 2),):((1, 4),)')
-    #print(l4, l4.shape)
-    #l4.visualize()
+    l4 = Layout.from_string('((4, 2),):((1, 4),)')
+    print(l4)
+    print(tuple(Layout.coordinates(l4.shape)))
+    l4.visualize()
 
     #l5 = Layout.from_string('(2,2),(2,2):(1,4),(2,8)')
     #print(l5, l5.shape)
@@ -335,9 +341,9 @@ if __name__ == "__main__":
     #print(composed)
     #A.visualize(); B.visualize(); composed.visualize()
 
-    A = Layout.from_string('20:2')
-    print(A)
-    A.visualize()
+    #A = Layout.from_string('20:2')
+    #print(A)
+    #A.visualize()
 
     #B = Layout.from_string('(5,4):(4,1)')
     #composed = A.composite(B)
