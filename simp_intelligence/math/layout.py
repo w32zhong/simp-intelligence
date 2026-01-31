@@ -1,6 +1,7 @@
 import ast
+import math
+import itertools
 import matplotlib.pyplot as plt
-from functools import reduce
 
 
 def default_color_map(index):
@@ -77,6 +78,12 @@ class Layout:
                 return cls(ast.literal_eval(s))
 
         return _recurr(string)
+
+    @classmethod
+    def from_chain(cls, chain):
+        shape = itertools.chain(layout.shape for layout in chain)
+        stride = itertools.chain(layout.stride for layout in chain)
+        return Layout(tuple(shape), tuple(stride))
 
     def __repr__(self):
         return f'{self.shape}:{self.stride}'
@@ -218,7 +225,7 @@ class Layout:
     def composite(self, other):
         if isinstance(other.shape, tuple):
             chain = list(self.composite(other_i) for other_i in other)
-            raise NotImplementedError
+            return Layout.from_chain(chain)
         else:
             result_shape = []
             result_stride = []
@@ -231,17 +238,17 @@ class Layout:
                 #         = (1, 1, 1, 4):(72w, 24x, 4x, 2z)
                 new_shape = max(1, cur_shape // remain_stride) # "dividing out"
                 new_shape = min(new_shape, remain_shape) # "modding out"
-                new_stride = cur_stride * remain_stride
-
-                result_shape.append(new_shape)
-                result_stride.append(new_stride)
+                new_stride = cur_stride * remain_stride # adjust stride
 
                 remain_shape = remain_shape // new_shape
                 remain_stride = math.ceil(remain_stride / cur_shape)
 
+                result_shape.append(new_shape)
+                result_stride.append(new_stride)
+
             result_shape.append(remain_shape)
             result_stride.append(remain_stride * self.stride[-1])
-            breakpoint()
+            return Layout(tuple(result_shape), tuple(result_stride))
 
 
 if __name__ == "__main__":
@@ -300,8 +307,22 @@ if __name__ == "__main__":
     #l7 = Layout.from_string('((2, (2, 2)), (2, (2, 2))):((1, (4, 16)), (2, (8, 32)))')
     #l7.visualize()
 
-    #plt.show()
+    #A = Layout.from_string('(6,2):(8,2)')
+    #B = Layout.from_string('(4,3):(3,1)')
+    #composed = A.composite(B)
+    #print(composed)
+    #A.visualize(); B.visualize(); composed.visualize()
 
-    A = Layout.from_string('(6,2):(8,2)')
-    B = Layout.from_string('(4,3):(3,1)')
-    A.composite(B)
+    #A = Layout.from_string('20:2')
+    #B = Layout.from_string('(5,4):(4,1)')
+    #composed = A.composite(B)
+    #print(composed)
+    #A.visualize(); B.visualize(); composed.visualize()
+
+    A = Layout.from_string('(10,2):(16,4)')
+    B = Layout.from_string('(5,4):(1,5)')
+    composed = A.composite(B)
+    print(composed)
+    A.visualize(); B.visualize(); composed.visualize()
+
+    plt.show()
