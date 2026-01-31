@@ -336,11 +336,13 @@ if __name__ == "__main__":
     l6 = Layout.from_string('((3, 3), 4):((1, 3), 10)')
     print(tuple(Layout.coordinates(l6.shape)))
     print(Layout.max_coordinates(l6.shape))
-    print(Layout.max_coordinates(l6.shape))
     print(l6.size(), l6.cosize())
 
     l7 = Layout.from_string('((2, (2, 2)), (2, (2, 2))):((1, (4, 16)), (2, (8, 32)))')
     #l7.visualize()
+
+    l8 = Layout.from_string('((3, 2), (2, 5)):((1, 6), (3, 12))')
+    #l8.visualize()
 
     A = Layout.from_string('(6,2):(8,2)')
     B = Layout.from_string('(4,3):(3,1)')
@@ -370,6 +372,6 @@ if __name__ == "__main__":
     B = Layout.from_string('(3,8):(1,1)')
     composed = A.composite(B, by_mode=True)
     print(composed)
-    A.visualize(); B.visualize(); composed.visualize()
+    #A.visualize(); B.visualize(); composed.visualize()
 
     plt.show()
