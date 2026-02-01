@@ -331,8 +331,16 @@ class Layout:
             cat = Layout.from_concate(other, compl)
             return self.composite(cat)
 
-    def logical_product(self, other):
-        pass
+    def logical_product(self, other, by_mode=False):
+        if by_mode:
+            cat = (self[i].logical_product(other_i) for i, other_i in enumerate(other))
+            return Layout.from_concate(*cat)
+        else:
+            # A ⊗ B := (A, ~A ∘ B)
+            size = self.size() * other.cosize()
+            compl = self.complement(size)
+            compo = compl.composite(other)
+            return Layout.from_concate(self, compo)
 
 
 if __name__ == "__main__":
@@ -447,8 +455,20 @@ if __name__ == "__main__":
     #A = Layout.from_string('((4,2,3),):((2,1,8),)').visualize()
     #A.logical_divide(Layout.from_string('4:2')).visualize()
 
-    A = Layout.from_string('(9,(4,8)):(59,(13,1))').visualize()
-    C = A.logical_divide(Layout.from_string('3,(2,4):3,(1,8)'), by_mode=True)
-    C.visualize()
+    #A = Layout.from_string('(9,(4,8)):(59,(13,1))').visualize()
+    #C = A.logical_divide(Layout.from_string('3,(2,4):3,(1,8)'), by_mode=True)
+    #C.visualize()
+
+    A = Layout.from_string('((2, 2),):((4, 1),)') #.visualize()
+    C = A.logical_product(Layout.from_string('6:1'))
+    print(C); #C.visualize()
+
+    A = Layout.from_string('((2, 2),):((4, 1),)') #.visualize()
+    C = A.logical_product(Layout.from_string('(4,2):(2,1)'))
+    print(C); #C.visualize()
+
+    A = Layout.from_string('(2, 5):(5, 1)') #.visualize()
+    C = A.logical_product(Layout.from_string('(3, 4):(5, 6)'), by_mode=True)
+    print(C); C.visualize()
 
     plt.show()
