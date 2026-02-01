@@ -153,17 +153,41 @@ class Layout:
         else:
             return (idx // self.stride) % self.shape
 
-    def visualize(self, color_map=default_color_map):
+    def visualize(self, title=None, *, size_pad=2.0, size_scaler=0.5, color_map=default_color_map):
         if len(self) == 3:
-            fig, axes = plt.subplots(self[0].size())
+            figsize = (
+                size_pad + self[-1].size() * size_scaler,
+                size_pad + (self[-2].size() * self[-1].size()) * size_scaler
+            )
+            fig, axes = plt.subplots(self[0].size(), figsize=figsize)
             for idx in range(self[0].size()):
-                self.visualize_2D_or_1D(axes[idx], idx, color_map)
-        elif len(self) in [2, 1]:
-            fig, ax = plt.subplots()
+                if self[0].size() == 1:
+                    self.visualize_2D_or_1D(axes, idx, color_map)
+                else:
+                    self.visualize_2D_or_1D(axes[idx], idx, color_map)
+
+        elif len(self) == 2:
+            figsize = (
+                size_pad + self[1].size() * size_scaler,
+                size_pad + self[0].size() * size_scaler
+            )
+            fig, ax = plt.subplots(figsize=figsize)
             self.visualize_2D_or_1D(ax, None, color_map)
+
+        elif len(self) == 1:
+            figsize = (
+                size_pad + self[0].size() * size_scaler,
+                size_pad + 1 * size_scaler
+            )
+            fig, ax = plt.subplots(figsize=figsize)
+            self.visualize_2D_or_1D(ax, None, color_map)
+
         else:
             raise NotImplementedError
+
+        fig.suptitle((f'{title} = ' if title else '') + str(self))
         plt.tight_layout()
+        return self
 
     def visualize_2D_or_1D(self, ax, z, color_map, debug=False):
         is_1D = (len(self) == 1)
@@ -184,13 +208,14 @@ class Layout:
                 _2D_crd = _2D.idx2crd(idx)
 
                 if z is None:
-                    crd = _2D_crd[-1] if is_1D else _2D_crd
+                    if is_1D:
+                        crd = _2D_crd[-1]
+                        if isinstance(crd, tuple) and len(crd) != len(self):
+                            crd = (crd,)
+                    else:
+                        crd = _2D_crd
                 else:
                     crd = (z, *_2D_crd)
-
-                if isinstance(crd, tuple) and len(crd) != len(self):
-                    assert len(self) == 1
-                    crd = (crd,)
 
                 offset = self.crd2idx(crd)
                 if debug: print(crd, '->', (m, n), '->', offset)
@@ -281,6 +306,20 @@ class Layout:
                 return Layout(result_shape[0], result_stride[0])
             else:
                 return Layout(tuple(result_shape), tuple(result_stride))
+
+    def complement(self, max_idx=1):
+        result_shape = []
+        result_stride = []
+        last_idx = 1
+        reindex = sorted(zip(flat(self.stride), flat(self.shape)))
+        for stride, shape in reindex:
+            # complement(Layout) = (d1, d2/(s1*d1), d3/(s2*d2), ...):(1, s1*d1, s2*d2, ...)
+            result_shape.append(stride // last_idx)
+            result_stride.append(last_idx)
+            last_idx = shape * stride
+        result_shape.append((max_idx + last_idx - 1) // last_idx) # ceil divide
+        result_stride.append(last_idx)
+        return Layout(tuple(result_shape), tuple(result_stride))
 
 
 if __name__ == "__main__":
@@ -373,5 +412,23 @@ if __name__ == "__main__":
     composed = A.composite(B, by_mode=True)
     print(composed)
     #A.visualize(); B.visualize(); composed.visualize()
+
+    def test_complement(string, cosize=24, visualize=False):
+        base = Layout.from_string(string)
+        comp = base.complement(cosize)
+        print('~', base, '=', comp)
+        chain = Layout.from_chain([base, comp])
+        assert chain.cosize() == cosize
+        if visualize:
+            base.visualize('Base')
+            comp.visualize('Complement')
+            chain.visualize('Full')
+
+    test_complement('4:1', visualize=False)
+    test_complement('6:4', visualize=False)
+    test_complement('(4,6):(1,4)', visualize=False)
+    test_complement('4:2', visualize=False)
+    test_complement('(2,4):(1,6)', visualize=False)
+    test_complement('(2,2):(1,6)', visualize=False)
 
     plt.show()
