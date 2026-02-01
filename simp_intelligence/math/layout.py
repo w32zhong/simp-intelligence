@@ -90,9 +90,9 @@ class Layout:
         return _recurr(string)
 
     @classmethod
-    def from_chain(cls, chain):
-        shape = itertools.chain(layout.shape for layout in chain)
-        stride = itertools.chain(layout.stride for layout in chain)
+    def from_concate(cls, *layouts):
+        shape = itertools.chain(layout.shape for layout in layouts)
+        stride = itertools.chain(layout.stride for layout in layouts)
         return Layout(tuple(shape), tuple(stride))
 
     def __repr__(self):
@@ -275,10 +275,10 @@ class Layout:
     def composite(self, other, by_mode=False):
         if isinstance(other.shape, tuple):
             if by_mode:
-                chain = list(self[i].composite(other_i) for i, other_i in enumerate(other))
+                cat = (self[i].composite(other_i) for i, other_i in enumerate(other))
             else:
-                chain = list(self.composite(other_i) for other_i in other)
-            return Layout.from_chain(chain)
+                cat = (self.composite(other_i) for other_i in other)
+            return Layout.from_concate(*cat)
         else:
             result_shape = []
             result_stride = []
@@ -320,6 +320,15 @@ class Layout:
         result_shape.append((max_idx + last_idx - 1) // last_idx) # ceil divide
         result_stride.append(last_idx)
         return Layout(tuple(result_shape), tuple(result_stride))
+
+    def logical_divide(self, other):
+        # A ⊘ B := A o (B, ~B)
+        compl = other.complement(self.size())
+        cat = Layout.from_concate(other, compl)
+        return self.composite(cat)
+
+    def logical_product(self, other):
+        pass
 
 
 if __name__ == "__main__":
@@ -417,12 +426,12 @@ if __name__ == "__main__":
         base = Layout.from_string(string)
         comp = base.complement(cosize)
         print('~', base, '=', comp)
-        chain = Layout.from_chain([base, comp])
-        assert chain.cosize() == cosize
+        full = Layout.from_concate(base, comp)
+        assert full.cosize() == cosize
         if visualize:
             base.visualize('Base')
             comp.visualize('Complement')
-            chain.visualize('Full')
+            full.visualize('Full')
 
     test_complement('4:1', visualize=False)
     test_complement('6:4', visualize=False)
@@ -430,5 +439,8 @@ if __name__ == "__main__":
     test_complement('4:2', visualize=False)
     test_complement('(2,4):(1,6)', visualize=False)
     test_complement('(2,2):(1,6)', visualize=False)
+
+    A = Layout.from_string('((4,2,3),):((2,1,8),)').visualize()
+    A.logical_divide(Layout.from_string('4:2')).visualize()
 
     plt.show()
