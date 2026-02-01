@@ -104,6 +104,9 @@ class Layout:
         else:
             return 1
 
+    def rank(self):
+        return len(self)
+
     def __getitem__(self, i):
         if isinstance(self.shape, tuple):
             return Layout(self.shape[i], self.stride[i])
@@ -342,6 +345,14 @@ class Layout:
             compo = compl.composite(other)
             return Layout.from_concate(self, compo)
 
+    def blocked_product(self, other):
+        prod = self.logical_product(other)
+        cat = []
+        for zipped in zip(prod[0], prod[1]):
+            inner_layout = Layout.from_concate(*zipped)
+            cat.append(inner_layout)
+        return Layout.from_concate(*cat)
+
 
 if __name__ == "__main__":
     #import cutlass.cute as cute
@@ -459,16 +470,20 @@ if __name__ == "__main__":
     #C = A.logical_divide(Layout.from_string('3,(2,4):3,(1,8)'), by_mode=True)
     #C.visualize()
 
-    A = Layout.from_string('((2, 2),):((4, 1),)') #.visualize()
-    C = A.logical_product(Layout.from_string('6:1'))
-    print(C); #C.visualize()
+    #A = Layout.from_string('((2, 2),):((4, 1),)') #.visualize()
+    #C = A.logical_product(Layout.from_string('6:1'))
+    #print(C); #C.visualize()
 
-    A = Layout.from_string('((2, 2),):((4, 1),)') #.visualize()
-    C = A.logical_product(Layout.from_string('(4,2):(2,1)'))
-    print(C); #C.visualize()
+    #A = Layout.from_string('((2, 2),):((4, 1),)') #.visualize()
+    #C = A.logical_product(Layout.from_string('(4,2):(2,1)'))
+    #print(C); #C.visualize()
 
-    A = Layout.from_string('(2, 5):(5, 1)') #.visualize()
-    C = A.logical_product(Layout.from_string('(3, 4):(5, 6)'), by_mode=True)
+    #A = Layout.from_string('(2, 5):(5, 1)') #.visualize()
+    #C = A.logical_product(Layout.from_string('(3, 4):(5, 6)'), by_mode=True)
+    #print(C); #C.visualize()
+
+    A = Layout.from_string('(2, 2):(2, 1)') #.visualize()
+    C = A.blocked_product(Layout.from_string('(2, 3):(3, 1)'))
     print(C); C.visualize()
 
     plt.show()
