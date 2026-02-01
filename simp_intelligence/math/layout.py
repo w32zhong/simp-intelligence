@@ -321,11 +321,15 @@ class Layout:
         result_stride.append(last_idx)
         return Layout(tuple(result_shape), tuple(result_stride))
 
-    def logical_divide(self, other):
-        # A ⊘ B := A o (B, ~B)
-        compl = other.complement(self.size())
-        cat = Layout.from_concate(other, compl)
-        return self.composite(cat)
+    def logical_divide(self, other, by_mode=False):
+        if by_mode:
+            cat = (self[i].logical_divide(other_i) for i, other_i in enumerate(other))
+            return Layout.from_concate(*cat)
+        else:
+            # A ⊘ B := A o (B, ~B)
+            compl = other.complement(self.size())
+            cat = Layout.from_concate(other, compl)
+            return self.composite(cat)
 
     def logical_product(self, other):
         pass
@@ -440,7 +444,11 @@ if __name__ == "__main__":
     test_complement('(2,4):(1,6)', visualize=False)
     test_complement('(2,2):(1,6)', visualize=False)
 
-    A = Layout.from_string('((4,2,3),):((2,1,8),)').visualize()
-    A.logical_divide(Layout.from_string('4:2')).visualize()
+    #A = Layout.from_string('((4,2,3),):((2,1,8),)').visualize()
+    #A.logical_divide(Layout.from_string('4:2')).visualize()
+
+    A = Layout.from_string('(9,(4,8)):(59,(13,1))').visualize()
+    C = A.logical_divide(Layout.from_string('3,(2,4):3,(1,8)'), by_mode=True)
+    C.visualize()
 
     plt.show()
