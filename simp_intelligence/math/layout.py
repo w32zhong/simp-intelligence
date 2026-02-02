@@ -4,9 +4,10 @@ import itertools
 import matplotlib.pyplot as plt
 
 
-def default_color_map(index):
+def default_color_map(index, cycle=None):
     colors = plt.cm.tab20b.colors[:]
-    return colors[index % len(colors)]
+    cycle = 1 if cycle is None else cycle
+    return colors[(index // cycle) % len(colors)]
 
 
 def cartesian_product(_tuple):
@@ -188,7 +189,8 @@ class Layout:
         else:
             return (idx // self.stride) % self.shape
 
-    def visualize(self, title=None, *, size_pad=2.0, size_scaler=0.5, color_map=default_color_map):
+    def visualize(self, title=None, *, size_pad=2.0, size_scaler=0.5,
+                  color_map=default_color_map, color_cycle=None):
         if len(self) == 3:
             figsize = (
                 size_pad + self[-1].size() * size_scaler,
@@ -197,9 +199,9 @@ class Layout:
             fig, axes = plt.subplots(self[0].size(), figsize=figsize)
             for idx in range(self[0].size()):
                 if self[0].size() == 1:
-                    self.visualize_2D_or_1D(axes, idx, color_map)
+                    self.visualize_2D_or_1D(axes, idx, color_map, color_cycle)
                 else:
-                    self.visualize_2D_or_1D(axes[idx], idx, color_map)
+                    self.visualize_2D_or_1D(axes[idx], idx, color_map, color_cycle)
 
         elif len(self) == 2:
             figsize = (
@@ -207,7 +209,7 @@ class Layout:
                 size_pad + self[0].size() * size_scaler
             )
             fig, ax = plt.subplots(figsize=figsize)
-            self.visualize_2D_or_1D(ax, None, color_map)
+            self.visualize_2D_or_1D(ax, None, color_map, color_cycle)
 
         elif len(self) == 1:
             figsize = (
@@ -215,7 +217,7 @@ class Layout:
                 size_pad + 1 * size_scaler
             )
             fig, ax = plt.subplots(figsize=figsize)
-            self.visualize_2D_or_1D(ax, None, color_map)
+            self.visualize_2D_or_1D(ax, None, color_map, color_cycle)
 
         else:
             raise NotImplementedError
@@ -224,7 +226,7 @@ class Layout:
         plt.tight_layout()
         return self
 
-    def visualize_2D_or_1D(self, ax, z, color_map, debug=False):
+    def visualize_2D_or_1D(self, ax, z, color_map, color_cycle, debug=False):
         is_1D = (len(self) == 1)
         N = self[-1].size()
         if is_1D:
@@ -255,7 +257,7 @@ class Layout:
                 offset = self.crd2idx(crd)
                 if debug: print(crd, '->', (m, n), '->', offset)
 
-                color = color_map(offset)
+                color = color_map(offset, color_cycle)
                 label = f'{offset}'
                 m_axis_ticks[m] = 0 if is_1D else crd[-2]
                 n_axis_ticks[n] = crd[-1] if isinstance(crd, tuple) else crd
@@ -508,9 +510,9 @@ if __name__ == "__main__":
     #A = Layout.from_string('((4,2,3),):((2,1,8),)').visualize()
     #A.logical_divide(Layout.from_string('4:2')).visualize()
 
-    A = Layout.from_string('(9,(4,8)):(59,(13,1))').visualize()
-    C = A.logical_divide(Layout.from_string('3,(2,4):3,(1,8)'), by_mode=True)
-    C.visualize()
+    #A = Layout.from_string('(9,(4,8)):(59,(13,1))') #.visualize()
+    #C = A.logical_divide(Layout.from_string('3,(2,4):3,(1,8)'), by_mode=True)
+    #C.visualize()
 
     #A = Layout.from_string('((2, 2),):((4, 1),)') #.visualize()
     #C = A.logical_product(Layout.from_string('6:1'))
@@ -520,9 +522,9 @@ if __name__ == "__main__":
     #C = A.logical_product(Layout.from_string('(4,2):(2,1)'))
     #print(C); #C.visualize()
 
-    #A = Layout.from_string('(2, 5):(5, 1)') #.visualize()
-    #C = A.logical_product(Layout.from_string('(3, 4):(5, 6)'), by_mode=True)
-    #print(C); #C.visualize()
+    A = Layout.from_string('(2, 5):(5, 1)') #.visualize()
+    C = A.logical_product(Layout.from_string('(3, 4):(5, 6)'), by_mode=True)
+    print(C); C.visualize(color_cycle=15)
 
     #A = Layout.from_string('(2, 2):(2, 1)') #.visualize()
     #C = A.blocked_product(Layout.from_string('(2, 3):(3, 1)'))
