@@ -413,14 +413,15 @@ if __name__ == "__main__":
         (2, (3, 4, 2), (5, (6, 8), 6))
     ))
 
+    print(l1.permute(2, 0, 1))
 
     print(coalesce(Layout.from_string('2, (1,6): 1, (6, 2)')))
-    print(coalesce(Layout.from_string('(2, 6): (3, 2)')))
+    print(coalesce(Layout.from_string('(3, 1): (2, 3)')))
+    print(coalesce(Layout.from_string('(2, 3): (3, 1)'))) # not handled
+    print(coalesce(Layout.from_string('(2, 3): (3, 1)').permute(1, 0))) # handled
 
     l1 = Layout(shape=(2, 3, 4))
     #l1.visualize()
-
-    #l1.permute(2, 0, 1).visualize()
 
     l2 = Layout.from_string('2,8')
     print(l2, l2.idx2crd(7))
