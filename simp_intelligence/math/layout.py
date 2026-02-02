@@ -342,7 +342,7 @@ class Layout:
             else:
                 return Layout(tuple(result_shape), tuple(result_stride))
 
-    def complement(self, max_idx=1):
+    def complement(self, max_idx=1, *, coalesce_result=True):
         result_shape = []
         result_stride = []
         last_idx = 1
@@ -352,9 +352,11 @@ class Layout:
             result_shape.append(stride // last_idx)
             result_stride.append(last_idx)
             last_idx = shape * stride
+
         result_shape.append((max_idx + last_idx - 1) // last_idx) # ceil divide
         result_stride.append(last_idx)
-        return Layout(tuple(result_shape), tuple(result_stride))
+        result = Layout(tuple(result_shape), tuple(result_stride))
+        return coalesce(result) if coalesce_result else result
 
     def logical_divide(self, other, by_mode=False):
         if by_mode:
@@ -413,14 +415,13 @@ if __name__ == "__main__":
         (2, (3, 4, 2), (5, (6, 8), 6))
     ))
 
-    print(l1.permute(2, 0, 1))
-
     print(coalesce(Layout.from_string('2, (1,6): 1, (6, 2)')))
     print(coalesce(Layout.from_string('(3, 1): (2, 3)')))
     print(coalesce(Layout.from_string('(2, 3): (3, 1)'))) # not handled
     print(coalesce(Layout.from_string('(2, 3): (3, 1)').permute(1, 0))) # handled
 
     l1 = Layout(shape=(2, 3, 4))
+    print(l1.permute(2, 0, 1))
     #l1.visualize()
 
     l2 = Layout.from_string('2,8')
@@ -482,9 +483,9 @@ if __name__ == "__main__":
     print(composed)
     #A.visualize(); B.visualize(); composed.visualize()
 
-    def test_complement(string, cosize=24, visualize=False):
+    def test_complement(string, cosize=24, coalesce=True, visualize=False):
         base = Layout.from_string(string)
-        comp = base.complement(cosize)
+        comp = base.complement(cosize, coalesce_result=coalesce)
         print('~', base, '=', comp)
         full = Layout.from_concate(base, comp)
         assert full.cosize() == cosize
@@ -493,12 +494,12 @@ if __name__ == "__main__":
             comp.visualize('Complement')
             full.visualize('Full')
 
-    test_complement('4:1', visualize=False)
-    test_complement('6:4', visualize=False)
-    test_complement('(4,6):(1,4)', visualize=False)
-    test_complement('4:2', visualize=False)
-    test_complement('(2,4):(1,6)', visualize=False)
-    test_complement('(2,2):(1,6)', visualize=False)
+    test_complement('4:1',         coalesce=True, visualize=False)
+    test_complement('6:4',         coalesce=True, visualize=False)
+    test_complement('(4,6):(1,4)', coalesce=True, visualize=False)
+    test_complement('4:2',         coalesce=True, visualize=False)
+    test_complement('(2,4):(1,6)', coalesce=True, visualize=False)
+    test_complement('(2,2):(1,6)', coalesce=True, visualize=False)
 
     #A = Layout.from_string('((4,2,3),):((2,1,8),)').visualize()
     #A.logical_divide(Layout.from_string('4:2')).visualize()
