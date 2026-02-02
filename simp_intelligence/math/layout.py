@@ -392,15 +392,27 @@ class Layout:
 
     @staticmethod
     def _hier_unzip(func_name, mine, other):
-        if isinstance(other.shape, tuple):
-            splits = list(Layout._hier_unzip(func_name, mine[i], other[i]) for i in range(len(other)))
-            layout0 = Layout.from_concate(*(split[0] for split in splits))
-            layout1 = Layout.from_concate(*(split[1] for split in splits))
-            merged = Layout.from_concate(layout0, layout1)
-            return merged
-        else:
-            r = Layout.logical_divide(mine, Layout(other.shape))
-            return r
+        # this function is more alike the one in Modular.max other than that in PyCute.
+
+        # Atomic case: if either is rank-1, don't zip, just divide.
+        if len(mine) == 1 or len(other) == 1:
+            return Layout.logical_divide(mine, Layout(other.shape))
+
+        # Recursive case: Zip the modes together
+        res_tiles = []
+        res_rests = []
+        for i in range(len(other)):
+            split = Layout._hier_unzip(func_name, mine[i], other[i])
+            res_tiles.append(split[0])
+            res_rests.append(split[1])
+        # Capture remaining modes of A into the 'Rest' part
+        for i in range(len(other), len(mine)):
+            res_rests.append(mine[i])
+
+        return Layout.from_concate(
+            Layout.from_concate(*res_tiles),
+            Layout.from_concate(*res_rests)
+        )
 
     def hierarchical_unzip(self, func_name, other):
         return Layout._hier_unzip(func_name, self, other)
