@@ -356,6 +356,10 @@ class Layout:
         result_shape.append((max_idx + last_idx - 1) // last_idx) # ceil divide
         result_stride.append(last_idx)
         result = Layout(tuple(result_shape), tuple(result_stride))
+        # The complement function calculates the "remaining" layout which is not a pre-existing
+        # structure, it does not require preserving the tuple structures to meet user intent.
+        # Hence here offers the default option to coalesce the result to avoid often fragmented
+        # structures from the complement result.
         return coalesce(result) if coalesce_result else result
 
     def logical_divide(self, other, by_mode=False):
