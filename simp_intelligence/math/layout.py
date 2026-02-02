@@ -58,6 +58,38 @@ def flat(t):
         return (t,)
 
 
+def coalesce(layout):
+    result_shape  = [1]
+    result_stride = [0]
+    for (shape, stride) in zip(flat(layout.shape), flat(layout.stride)):
+        if shape == 1:
+            # skip current trival shape
+            # s0:d0  ++  1:d1  =>  s0:d0
+            continue
+
+        elif result_shape[-1] == 1:
+            # skip previous trival shape
+            # 1:d0  ++  s1:d1  =>  s1:d1
+            result_shape[-1]  = shape
+            result_stride[-1] = stride
+
+        elif result_shape[-1] * result_stride[-1] == stride:
+            # coalesce continous dimensions
+            # s0:d0  ++  s1:s0*d0  =>  s0*s1:d0
+            result_shape[-1] = result_shape[-1] * shape
+
+        else:
+            # nothing can be simplified
+            # s0:d0  ++  s1:d1  =>  (s0,s1):(d0,d1)
+            result_shape.append(shape)
+            result_stride.append(stride)
+
+    if len(result_shape) == 1:
+        return Layout(result_shape[0], result_stride[0])
+    else:
+        return Layout(tuple(result_shape), tuple(result_stride))
+
+
 class Layout:
     def __init__(self, shape, stride=None):
         self.shape = shape
@@ -381,6 +413,10 @@ if __name__ == "__main__":
         (2, (3, 4, 2), (5, (6, 8), 6))
     ))
 
+
+    print(coalesce(Layout.from_string('2, (1,6): 1, (6, 2)')))
+    print(coalesce(Layout.from_string('(2, 6): (3, 2)')))
+
     l1 = Layout(shape=(2, 3, 4))
     #l1.visualize()
 
@@ -466,9 +502,9 @@ if __name__ == "__main__":
     #A = Layout.from_string('((4,2,3),):((2,1,8),)').visualize()
     #A.logical_divide(Layout.from_string('4:2')).visualize()
 
-    #A = Layout.from_string('(9,(4,8)):(59,(13,1))').visualize()
-    #C = A.logical_divide(Layout.from_string('3,(2,4):3,(1,8)'), by_mode=True)
-    #C.visualize()
+    A = Layout.from_string('(9,(4,8)):(59,(13,1))').visualize()
+    C = A.logical_divide(Layout.from_string('3,(2,4):3,(1,8)'), by_mode=True)
+    C.visualize()
 
     #A = Layout.from_string('((2, 2),):((4, 1),)') #.visualize()
     #C = A.logical_product(Layout.from_string('6:1'))
@@ -482,8 +518,8 @@ if __name__ == "__main__":
     #C = A.logical_product(Layout.from_string('(3, 4):(5, 6)'), by_mode=True)
     #print(C); #C.visualize()
 
-    A = Layout.from_string('(2, 2):(2, 1)') #.visualize()
-    C = A.blocked_product(Layout.from_string('(2, 3):(3, 1)'))
-    print(C); C.visualize()
+    #A = Layout.from_string('(2, 2):(2, 1)') #.visualize()
+    #C = A.blocked_product(Layout.from_string('(2, 3):(3, 1)'))
+    #print(C); C.visualize()
 
     plt.show()
