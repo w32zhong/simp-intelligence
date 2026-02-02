@@ -393,21 +393,34 @@ class Layout:
             cat.append(inner_layout)
         return Layout.from_concate(*cat)
 
+    @staticmethod
+    def _hier_unzip(func_name, mine, other):
+        if isinstance(other.shape, tuple):
+            splits = list(Layout._hier_unzip(func_name, mine[i], other[i]) for i in range(len(other)))
+            layout0 = Layout.from_concate(*(split[0] for split in splits))
+            layout1 = Layout.from_concate(*(split[1] for split in splits))
+            merged = Layout.from_concate(layout0, layout1)
+            return merged
+        else:
+            r = Layout.logical_divide(mine, other)
+            print(mine, '|', other, '=', r)
+            return r
+
+    def hierarchical_unzip(self, func_name, other):
+        return Layout._hier_unzip(func_name, self, other)
+
 
 if __name__ == "__main__":
-    #import cutlass.cute as cute
-    #@cute.jit
-    #def test():
-    #    base = cute.make_layout(shape=(6, 8), stride=(8, 1))
-    #    tiler = cute.make_layout(shape=(3, 2), stride=(1, 3))
-    #    composed = cute.composition(base, tiler)
-    #    print(composed) # (3,2):(8,24)
-
-    #    base = cute.make_layout(shape=(6, 2), stride=(8, 2))
-    #    tiler = cute.make_layout(shape=(4, 3), stride=(3, 1))
-    #    composed = cute.composition(base, tiler)
-    #    print(composed) # ((2,2),3):((24,2),8)
-    #test()
+    import cutlass.cute as cute
+    @cute.jit
+    def test():
+        A = cute.make_layout((64,32), stride = (32,1))
+        B = cute.make_layout((4,4), stride = (1,64))
+        result1 = cute.logical_divide(A, B) # ((4,4),(16,8)):((32,1),(128,4))
+        print(result1)
+        result2 = cute.zipped_divide(A, B) # ((4,4),(16,8)):((32,1),(128,4))
+        print(result2)
+    #test(); quit()
 
     print(cartesian_product(
         (2, (3, 4), (5, (6, 8)))
@@ -507,12 +520,21 @@ if __name__ == "__main__":
     test_complement('(2,4):(1,6)', coalesce=True, visualize=False)
     test_complement('(2,2):(1,6)', coalesce=True, visualize=False)
 
+    #A = Layout.from_string('(64,32):(32,1)')
+    #B = Layout.from_string('(4,4):(1,64)')
+    #C = A.logical_divide(B) # ((4,4),(16,8)):((32,1),(128,4))
+
     #A = Layout.from_string('((4,2,3),):((2,1,8),)').visualize()
     #A.logical_divide(Layout.from_string('4:2')).visualize()
 
-    #A = Layout.from_string('(9,(4,8)):(59,(13,1))') #.visualize()
-    #C = A.logical_divide(Layout.from_string('3,(2,4):3,(1,8)'), by_mode=True)
-    #C.visualize()
+    A = Layout.from_string('(9,(4,8)):(59,(13,1))') #.visualize()
+    B = Layout.from_string('3,(2,4):3,(1,8)')
+    print(A, '⊘', B)
+    C = A.logical_divide(B, by_mode=True)
+    print(C) #C.visualize()
+    D = A.hierarchical_unzip(None, B)
+    print(D)
+    quit()
 
     #A = Layout.from_string('((2, 2),):((4, 1),)') #.visualize()
     #C = A.logical_product(Layout.from_string('6:1'))
