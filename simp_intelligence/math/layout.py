@@ -414,11 +414,13 @@ if __name__ == "__main__":
     import cutlass.cute as cute
     @cute.jit
     def test():
-        A = cute.make_layout((64,32), stride = (32,1))
-        B = cute.make_layout((4,4), stride = (1,64))
-        result1 = cute.logical_divide(A, B) # ((4,4),(16,8)):((32,1),(128,4))
+        A = cute.make_layout((9, (4, 8)), stride=(59, (13, 1)))
+        b0 = cute.make_layout(3, stride=3)
+        b1 = cute.make_layout((2, 4), stride=(1, 8))
+        B = (b0, b1)
+        result1 = cute.logical_divide(A, B)
         print(result1)
-        result2 = cute.zipped_divide(A, B) # ((4,4),(16,8)):((32,1),(128,4))
+        result2 = cute.zipped_divide(A, B)
         print(result2)
     #test(); quit()
 
