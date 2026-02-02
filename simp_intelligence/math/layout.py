@@ -1,6 +1,4 @@
-import ast
-import math
-import itertools
+import ast, math
 import matplotlib.pyplot as plt
 
 
