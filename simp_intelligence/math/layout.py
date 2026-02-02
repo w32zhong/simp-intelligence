@@ -124,9 +124,9 @@ class Layout:
 
     @classmethod
     def from_concate(cls, *layouts):
-        shape = itertools.chain(layout.shape for layout in layouts)
-        stride = itertools.chain(layout.stride for layout in layouts)
-        return Layout(tuple(shape), tuple(stride))
+        shape = tuple(layout.shape for layout in layouts)
+        stride = tuple(layout.stride for layout in layouts)
+        return Layout(shape, stride)
 
     def __repr__(self):
         return f'{self.shape}:{self.stride}'
@@ -339,10 +339,7 @@ class Layout:
             result_shape.append(remain_shape)
             result_stride.append(remain_stride * flat(self.stride)[-1])
 
-            if len(result_shape) == 1:
-                return Layout(result_shape[0], result_stride[0])
-            else:
-                return Layout(tuple(result_shape), tuple(result_stride))
+            return coalesce(Layout(tuple(result_shape), tuple(result_stride)))
 
     def complement(self, max_idx=1, *, coalesce_result=True):
         result_shape = []
@@ -402,8 +399,7 @@ class Layout:
             merged = Layout.from_concate(layout0, layout1)
             return merged
         else:
-            r = Layout.logical_divide(mine, other)
-            print(mine, '|', other, '=', r)
+            r = Layout.logical_divide(mine, Layout(other.shape))
             return r
 
     def hierarchical_unzip(self, func_name, other):
@@ -418,9 +414,9 @@ if __name__ == "__main__":
         b0 = cute.make_layout(3, stride=3)
         b1 = cute.make_layout((2, 4), stride=(1, 8))
         B = (b0, b1)
-        result1 = cute.logical_divide(A, B)
+        result1 = cute.logical_divide(A, B) # ((3,3),((2,4),(2,2))):((177,59),((13,2),(26,1)))
         print(result1)
-        result2 = cute.zipped_divide(A, B)
+        result2 = cute.zipped_divide(A, B) # ((3,(2,4)),(3,(2,2))):((177,(13,2)),(59,(26,1)))
         print(result2)
     #test(); quit()
 
@@ -532,9 +528,9 @@ if __name__ == "__main__":
     A = Layout.from_string('(9,(4,8)):(59,(13,1))') #.visualize()
     B = Layout.from_string('3,(2,4):3,(1,8)')
     print(A, '⊘', B)
-    C = A.logical_divide(B, by_mode=True)
+    C = A.logical_divide(B, by_mode=True) # ((3, 3), ((2, 4), (2, 2))):((177, 59), ((13, 2), (26, 1)))
     print(C) #C.visualize()
-    D = A.hierarchical_unzip(None, B)
+    D = A.hierarchical_unzip(None, B) # ((3, (2, 4)), (3, (2, 2))):((59, (13, 1)), (177, (26, 4)))
     print(D)
     quit()
 
