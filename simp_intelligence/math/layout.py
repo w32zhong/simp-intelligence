@@ -328,7 +328,8 @@ class Layout:
                 new_shape = min(new_shape, remain_shape) # "modding out"
                 new_stride = cur_stride * remain_stride # adjust stride
 
-                if verbose: print(f'+ max(1, {cur_shape}/{remain_stride}):{cur_stride}*{remain_stride}')
+                if verbose:
+                    print(f'+ min({cur_shape}/{remain_stride}, {remain_shape}):{cur_stride}*{remain_stride}')
 
                 remain_shape = remain_shape // new_shape
                 remain_stride = math.ceil(remain_stride / cur_shape)
@@ -336,9 +337,9 @@ class Layout:
                 result_shape.append(new_shape)
                 result_stride.append(new_stride)
 
-            if verbose: print(f'+ {remain_shape}:{remain_stride}*{flat(self.stride)[-1]}')
+            if verbose: print(f'+ {remain_shape}:{flat(self.stride)[-1]}*{remain_stride}', end="\n\n")
             result_shape.append(remain_shape)
-            result_stride.append(remain_stride * flat(self.stride)[-1])
+            result_stride.append(flat(self.stride)[-1] * remain_stride)
 
             return coalesce(Layout(tuple(result_shape), tuple(result_stride)))
 
