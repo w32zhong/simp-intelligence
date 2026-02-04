@@ -339,18 +339,20 @@ class Layout:
 
             return coalesce(Layout(tuple(result_shape), tuple(result_stride)))
 
-    def complement(self, max_idx=1, *, coalesce_result=True):
+    def complement(self, cotarget=1, *, coalesce_result=True, verbose=False):
         result_shape = []
         result_stride = []
         last_idx = 1
         reindex = sorted(zip(flat(self.stride), flat(self.shape)))
         for stride, shape in reindex:
             # complement(Layout) = (d1, d2/(s1*d1), d3/(s2*d2), ...):(1, s1*d1, s2*d2, ...)
+            if verbose: print(f'+ {stride}/{last_idx}:{last_idx}')
             result_shape.append(stride // last_idx)
             result_stride.append(last_idx)
             last_idx = shape * stride
 
-        result_shape.append((max_idx + last_idx - 1) // last_idx) # ceil divide
+        if verbose: print(f'+ {cotarget}/{last_idx}:{last_idx}')
+        result_shape.append(math.ceil(cotarget / last_idx))
         result_stride.append(last_idx)
         result = Layout(tuple(result_shape), tuple(result_stride))
         # The complement function calculates the "remaining" layout which is not a pre-existing
