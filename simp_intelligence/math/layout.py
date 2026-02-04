@@ -307,12 +307,12 @@ class Layout:
         new_stride = tuple(self.stride[d] for d in dims)
         return Layout(new_shape, new_stride)
 
-    def composite(self, other, by_mode=False):
+    def composite(self, other, *, by_mode=False, verbose=False):
         if isinstance(other.shape, tuple):
             if by_mode:
-                cat = (self[i].composite(other_i) for i, other_i in enumerate(other))
+                cat = (self[i].composite(other_i, verbose=verbose) for i, other_i in enumerate(other))
             else:
-                cat = (self.composite(other_i) for other_i in other)
+                cat = (self.composite(other_i, verbose=verbose) for other_i in other)
             return Layout.from_concate(*cat)
         else:
             result_shape = []
@@ -328,12 +328,15 @@ class Layout:
                 new_shape = min(new_shape, remain_shape) # "modding out"
                 new_stride = cur_stride * remain_stride # adjust stride
 
+                if verbose: print(f'+ max(1, {cur_shape}/{remain_stride}):{cur_stride}*{remain_stride}')
+
                 remain_shape = remain_shape // new_shape
                 remain_stride = math.ceil(remain_stride / cur_shape)
 
                 result_shape.append(new_shape)
                 result_stride.append(new_stride)
 
+            if verbose: print(f'+ {remain_shape}:{remain_stride}*{flat(self.stride)[-1]}')
             result_shape.append(remain_shape)
             result_stride.append(remain_stride * flat(self.stride)[-1])
 
@@ -363,31 +366,41 @@ class Layout:
 
     def logical_divide(self, other, by_mode=False, visualize_steps=False):
         if by_mode:
-            cat = (self[i].logical_divide(other_i) for i, other_i in enumerate(other))
+            cat = (
+                self[i].logical_divide(other_i, visualize_steps=visualize_steps)
+                for i, other_i in enumerate(other)
+            )
             return Layout.from_concate(*cat)
         else:
             # A ⊘ B := A o (B, ~B)
             compl = other.complement(self.size())
-            if visualize_steps: compl.visualize(title='complement(B)')
+            if visualize_steps: compl.visualize(title=f'complement({other}, {self.size()})')
             cat = Layout.from_concate(other, compl)
-            if visualize_steps: cat.visualize(title='concate(B, complement(B))')
+            if visualize_steps: cat.visualize(title=f'concate({other}, {compl})')
             res = self.composite(cat)
-            if visualize_steps: res.visualize(title='A.composite(concate(B, complement(B)))')
+            if visualize_steps: res.visualize(title=f'composite({self}, {cat})')
             return res
 
-    def logical_product(self, other, by_mode=False):
+    def logical_product(self, other, by_mode=False, visualize_steps=False):
         if by_mode:
-            cat = (self[i].logical_product(other_i) for i, other_i in enumerate(other))
+            cat = (
+                self[i].logical_product(other_i, visualize_steps=visualize_steps)
+                for i, other_i in enumerate(other)
+            )
             return Layout.from_concate(*cat)
         else:
             # A ⊗ B := (A, ~A ∘ B)
             size = self.size() * other.cosize()
             compl = self.complement(size)
+            if visualize_steps: compl.visualize(title=f'complement({self}, {size})')
             compo = compl.composite(other)
-            return Layout.from_concate(self, compo)
+            if visualize_steps: compo.visualize(title=f'composite({compl}, {other})')
+            res = Layout.from_concate(self, compo)
+            if visualize_steps: res.visualize(title=f'concate({self}, {compo})')
+            return res
 
-    def blocked_product(self, other):
-        prod = self.logical_product(other)
+    def blocked_product(self, other, **kwargs):
+        prod = self.logical_product(other, **kwargs)
         cat = []
         for zipped in zip(prod[0], prod[1]):
             inner_layout = Layout.from_concate(*zipped)
@@ -395,18 +408,18 @@ class Layout:
         return Layout.from_concate(*cat)
 
     @staticmethod
-    def _hier_unzip(func_name, mine, other):
+    def _hier_unzip(func_name, mine, other, **kwargs):
         # this function is more alike the one in Modular.max other than that in PyCute.
 
         # Atomic case: if either is rank-1, don't zip, just divide.
         if len(mine) == 1 or len(other) == 1:
-            return getattr(Layout, func_name)(mine, Layout(other.shape))
+            return getattr(Layout, func_name)(mine, Layout(other.shape), **kwargs)
 
         # Recursive case: Zip the modes together
         res_tiles = []
         res_rests = []
         for i in range(len(other)):
-            split = Layout._hier_unzip(func_name, mine[i], other[i])
+            split = Layout._hier_unzip(func_name, mine[i], other[i], **kwargs)
             res_tiles.append(split[0])
             res_rests.append(split[1])
         # Capture remaining modes of A into the 'Rest' part
@@ -418,8 +431,8 @@ class Layout:
             Layout.from_concate(*res_rests)
         )
 
-    def hierarchical_unzip(self, func_name, other):
-        return Layout._hier_unzip(func_name, self, other)
+    def hierarchical_unzip(self, func_name, other, **kwargs):
+        return Layout._hier_unzip(func_name, self, other, **kwargs)
 
 
 if __name__ == "__main__":
@@ -488,7 +501,7 @@ if __name__ == "__main__":
 
     A = Layout.from_string('(6,2):(8,2)')
     B = Layout.from_string('(4,3):(3,1)')
-    composed = A.composite(B)
+    composed = A.composite(B, verbose=True)
     print(composed)
     #A.visualize(); B.visualize(); composed.visualize()
 
@@ -538,7 +551,7 @@ if __name__ == "__main__":
     #B = Layout.from_string('(4,4):(1,64)')
     #C = A.logical_divide(B) # ((4,4),(16,8)):((32,1),(128,4))
 
-    A = Layout.from_string('(4,2,3):(2,1,8)').visualize()
+    A = Layout.from_string('(4,2,3):(2,1,8)') #.visualize()
     A.logical_divide(Layout.from_string('4:2'), visualize_steps=True)
 
     #A = Layout.from_string('((4,2,3),):((2,1,8),)').visualize()
