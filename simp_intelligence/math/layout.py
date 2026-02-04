@@ -396,7 +396,7 @@ class Layout:
 
         # Atomic case: if either is rank-1, don't zip, just divide.
         if len(mine) == 1 or len(other) == 1:
-            return Layout.logical_divide(mine, Layout(other.shape))
+            return getattr(Layout, func_name)(mine, Layout(other.shape))
 
         # Recursive case: Zip the modes together
         res_tiles = []
@@ -542,9 +542,8 @@ if __name__ == "__main__":
     print(A, '⊘', B)
     C = A.logical_divide(B, by_mode=True) # ((3, 3), ((2, 4), (2, 2))):((177, 59), ((13, 2), (26, 1)))
     print(C) #C.visualize()
-    D = A.hierarchical_unzip(None, B) # ((3, (2, 4)), (3, (2, 2))):((59, (13, 1)), (177, (26, 4)))
+    D = A.hierarchical_unzip('logical_divide', B) # ((3, (2, 4)), (3, (2, 2))):((59, (13, 1)), (177, (26, 4)))
     print(D)
-    quit()
 
     #A = Layout.from_string('((2, 2),):((4, 1),)') #.visualize()
     #C = A.logical_product(Layout.from_string('6:1'))
@@ -561,5 +560,9 @@ if __name__ == "__main__":
     #A = Layout.from_string('(2, 2):(2, 1)') #.visualize()
     #C = A.blocked_product(Layout.from_string('(2, 3):(3, 1)'))
     #print(C); C.visualize()
+
+    A = Layout.from_string('(2, 5):(5, 1)') #.visualize()
+    C = A.blocked_product(Layout.from_string('(3, 4):(1, 3)'))
+    print(C); #C.visualize()
 
     plt.show()
