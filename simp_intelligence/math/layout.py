@@ -187,6 +187,13 @@ class Layout:
         else:
             return (idx // self.stride) % self.shape
 
+    def capture_idx2crd_table(self):
+        table = dict()
+        for crd in Layout.coordinates(self.shape):
+            idx = self.crd2idx(crd)
+            table[idx] = crd
+        return table
+
     def visualize(self, title=None, *, size_pad=2.0, size_scaler=0.5,
                   color_map=default_color_map, color_cycle=None):
         if len(self) == 3:
