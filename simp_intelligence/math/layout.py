@@ -361,15 +361,19 @@ class Layout:
         # structures from the complement result.
         return coalesce(result) if coalesce_result else result
 
-    def logical_divide(self, other, by_mode=False):
+    def logical_divide(self, other, by_mode=False, visualize_steps=False):
         if by_mode:
             cat = (self[i].logical_divide(other_i) for i, other_i in enumerate(other))
             return Layout.from_concate(*cat)
         else:
             # A ⊘ B := A o (B, ~B)
             compl = other.complement(self.size())
+            if visualize_steps: compl.visualize(title='complement(B)')
             cat = Layout.from_concate(other, compl)
-            return self.composite(cat)
+            if visualize_steps: cat.visualize(title='concate(B, complement(B))')
+            res = self.composite(cat)
+            if visualize_steps: res.visualize(title='A.composite(concate(B, complement(B)))')
+            return res
 
     def logical_product(self, other, by_mode=False):
         if by_mode:
@@ -534,6 +538,9 @@ if __name__ == "__main__":
     #B = Layout.from_string('(4,4):(1,64)')
     #C = A.logical_divide(B) # ((4,4),(16,8)):((32,1),(128,4))
 
+    A = Layout.from_string('(4,2,3):(2,1,8)').visualize()
+    A.logical_divide(Layout.from_string('4:2'), visualize_steps=True)
+
     #A = Layout.from_string('((4,2,3),):((2,1,8),)').visualize()
     #A.logical_divide(Layout.from_string('4:2')).visualize()
 
@@ -555,7 +562,7 @@ if __name__ == "__main__":
 
     A = Layout.from_string('(2, 5):(5, 1)') #.visualize()
     C = A.logical_product(Layout.from_string('(3, 4):(5, 6)'), by_mode=True)
-    print(C); C.visualize(color_cycle=15)
+    print(C); #C.visualize(color_cycle=15)
 
     #A = Layout.from_string('(2, 2):(2, 1)') #.visualize()
     #C = A.blocked_product(Layout.from_string('(2, 3):(3, 1)'))
