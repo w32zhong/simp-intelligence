@@ -443,6 +443,17 @@ class Layout:
         return Layout._hier_unzip(func_name, self, other, **kwargs)
 
 
+class Tensor:
+    def __init__(self, ptr, layout, offset=0):
+        self.ptr = ptr
+        self.layout = layout
+        self.offset = offset
+
+    def slice(self, coord):
+        new_layout, new_offset = slice_and_offset(self.layout, coord)
+        return Tensor(self.ptr, new_layout, self.offset + new_offset)
+
+
 if __name__ == "__main__":
     import cutlass.cute as cute
     @cute.jit
