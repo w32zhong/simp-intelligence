@@ -443,6 +443,84 @@ class Layout:
         return Layout._hier_unzip(func_name, self, other, **kwargs)
 
 
+def slice_and_offset(layout, coord):
+    if coord is None:
+        return layout, 0
+
+    def recurse(shape, stride, c):
+        if c is None or c == slice(None):
+            return shape, stride, 0
+
+        if isinstance(c, int):
+            if isinstance(shape, int):
+                return None, None, c * stride
+            elif isinstance(shape, tuple):
+                c = (c,)
+            else:
+                 raise ValueError(f"Mismatch: int coord {c} for tuple shape {shape}")
+
+        if isinstance(c, slice):
+            if isinstance(shape, int):
+                start, stop, step = c.indices(shape)
+                if step > 0:
+                     new_dim = len(range(start, stop, step))
+                else:
+                     new_dim = len(range(start, stop, step))
+                return new_dim, stride * step, start * stride
+            else:
+                raise NotImplementedError("Slicing a tuple-shape mode is not directly supported")
+
+        if isinstance(c, tuple):
+            if isinstance(shape, int):
+                raise ValueError("Mismatch: tuple coord for int shape")
+
+            if Ellipsis in c:
+                idx = c.index(Ellipsis)
+                head = c[:idx]
+                tail = c[idx+1:]
+                expansion_len = len(shape) - len(head) - len(tail)
+                if expansion_len < 0:
+                    raise IndexError("Too many indices for layout")
+                c = head + (slice(None),) * expansion_len + tail
+
+            if len(c) < len(shape):
+                c = c + (slice(None),) * (len(shape) - len(c))
+
+            if len(c) != len(shape):
+                 raise IndexError(f"Shape mismatch: {len(shape)} vs {len(c)}")
+
+            new_shapes = []
+            new_strides = []
+            current_offset = 0
+
+            for s, d, sub_c in zip(shape, stride, c):
+                rs, rd, ro = recurse(s, d, sub_c)
+                if rs is not None:
+                    new_shapes.append(rs)
+                    new_strides.append(rd)
+                current_offset += ro
+
+            if len(new_shapes) == 1:
+                return new_shapes[0], new_strides[0], current_offset
+            elif len(new_shapes) == 0:
+                return 1, 0, current_offset
+            else:
+                return tuple(new_shapes), tuple(new_strides), current_offset
+
+        raise TypeError(f"Unexpected coordinate type: {type(c)}")
+
+    if isinstance(layout.shape, tuple):
+        if not isinstance(coord, tuple):
+            coord = (coord,)
+
+    s, d, off = recurse(layout.shape, layout.stride, coord)
+
+    if s is None:
+        s, d = 1, 0
+
+    return Layout(s, d), off
+
+
 class Tensor:
     def __init__(self, ptr, layout, offset=0):
         self.ptr = ptr
@@ -603,5 +681,44 @@ if __name__ == "__main__":
     A = Layout.from_string('(2, 5):(5, 1)') #.visualize()
     C = A.blocked_product(Layout.from_string('(3, 4):(1, 3)'))
     print(C); #C.visualize()
+
+    # --- slice_and_offset & Tensor tests ---
+    print("\n--- Testing slice_and_offset & Tensor ---")
+    l = Layout((10, 20))
+    # 1. Exact location
+    res, off = slice_and_offset(l, (1, 2))
+    assert off == 21
+    assert res.shape == 1
+    print("Exact location test passed")
+
+    # 2. Slice location
+    res, off = slice_and_offset(l, (slice(1, 5), slice(None)))
+    assert res.shape == (4, 20)
+    assert off == 1
+    print("Slice location test passed")
+
+    # 3. None/Ellipsis
+    res, off = slice_and_offset(l, (1, Ellipsis))
+    assert res.shape == 20
+    assert off == 1
+    print("Ellipsis test passed")
+
+    res, off = slice_and_offset(l, None)
+    assert res.shape == (10, 20)
+    print("None test passed")
+
+    # Nested
+    l_nested = Layout((10, (4, 5)))
+    res, off = slice_and_offset(l_nested, (1, 2))
+    assert off == 21
+    assert res.shape == 5
+    print("Nested layout test passed")
+
+    # Tensor integration
+    t = Tensor("ptr", l)
+    t_sliced = t.slice((1, 2))
+    print(f"Tensor sliced offset: {t_sliced.offset}")
+    assert t_sliced.offset == 21
+    print("Tensor slice test passed")
 
     plt.show()
