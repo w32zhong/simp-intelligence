@@ -194,7 +194,7 @@ class Layout:
             table[idx] = crd
         return table
 
-    def visualize(self, title=None, *, size_pad=2.0, size_scaler=0.5,
+    def visualize(self, title=None, size_pad=2.0, size_scaler=0.5, offset=0,
                   color_map=default_color_map, color_cycle=None):
         if len(self) == 3:
             figsize = (
@@ -204,9 +204,9 @@ class Layout:
             fig, axes = plt.subplots(self[0].size(), figsize=figsize)
             for idx in range(self[0].size()):
                 if self[0].size() == 1:
-                    self.visualize_2D_or_1D(axes, idx, color_map, color_cycle)
+                    self.visualize_2D_or_1D(axes, idx, offset, color_map, color_cycle)
                 else:
-                    self.visualize_2D_or_1D(axes[idx], idx, color_map, color_cycle)
+                    self.visualize_2D_or_1D(axes[idx], idx, offset, color_map, color_cycle)
 
         elif len(self) == 2:
             figsize = (
@@ -214,7 +214,7 @@ class Layout:
                 size_pad + self[0].size() * size_scaler
             )
             fig, ax = plt.subplots(figsize=figsize)
-            self.visualize_2D_or_1D(ax, None, color_map, color_cycle)
+            self.visualize_2D_or_1D(ax, None, offset, color_map, color_cycle)
 
         elif len(self) == 1:
             figsize = (
@@ -222,7 +222,7 @@ class Layout:
                 size_pad + 1 * size_scaler
             )
             fig, ax = plt.subplots(figsize=figsize)
-            self.visualize_2D_or_1D(ax, None, color_map, color_cycle)
+            self.visualize_2D_or_1D(ax, None, offset, color_map, color_cycle)
 
         else:
             raise NotImplementedError
@@ -231,7 +231,7 @@ class Layout:
         plt.tight_layout()
         return self
 
-    def visualize_2D_or_1D(self, ax, z, color_map, color_cycle, debug=False):
+    def visualize_2D_or_1D(self, ax, z, base_offset, color_map, color_cycle, debug=False):
         is_1D = (len(self) == 1)
         N = self[-1].size()
         if is_1D:
@@ -259,7 +259,7 @@ class Layout:
                 else:
                     crd = (z, *_2D_crd)
 
-                offset = self.crd2idx(crd)
+                offset = self.crd2idx(crd) + base_offset
                 if debug: print(crd, '->', (m, n), '->', offset)
 
                 color = color_map(offset, color_cycle)
@@ -443,93 +443,85 @@ class Layout:
         return Layout._hier_unzip(func_name, self, other, **kwargs)
 
 
-def slice_and_offset(layout, coord):
-    if coord is None:
-        return layout, 0
+def layout_slice(shape, stride, crd):
+    if crd is None or crd == slice(None):
+        return shape, stride, 0
 
-    def recurse(shape, stride, c):
-        if c is None or c == slice(None):
-            return shape, stride, 0
+    elif isinstance(crd, int):
+        if isinstance(shape, int):
+            return 1, 0, crd * stride
 
-        if isinstance(c, int):
-            if isinstance(shape, int):
-                return None, None, c * stride
-            elif isinstance(shape, tuple):
-                c = (c,)
-            else:
-                 raise ValueError(f"Mismatch: int coord {c} for tuple shape {shape}")
+        elif isinstance(shape, tuple):
+            return layout_slice(shape, stride, (crd,)) # dive in
 
-        if isinstance(c, slice):
-            if isinstance(shape, int):
-                start, stop, step = c.indices(shape)
-                if step > 0:
-                     new_dim = len(range(start, stop, step))
-                else:
-                     new_dim = len(range(start, stop, step))
-                return new_dim, stride * step, start * stride
-            else:
-                raise NotImplementedError("Slicing a tuple-shape mode is not directly supported")
+        else:
+            raise IndexError(f"Mismatch: int coord {crd} for shape {shape}")
 
-        if isinstance(c, tuple):
-            if isinstance(shape, int):
-                raise ValueError("Mismatch: tuple coord for int shape")
+    elif isinstance(crd, slice):
+        if isinstance(shape, int):
+            start, stop, step = crd.indices(shape)
+            new_shape = len(range(start, stop, step))
+            return new_shape, step * stride, start * stride
 
-            if Ellipsis in c:
-                idx = c.index(Ellipsis)
-                head = c[:idx]
-                tail = c[idx+1:]
-                expansion_len = len(shape) - len(head) - len(tail)
-                if expansion_len < 0:
-                    raise IndexError("Too many indices for layout")
-                c = head + (slice(None),) * expansion_len + tail
+        elif isinstance(shape, tuple):
+            return layout_slice(shape, stride, (crd,)) # dive in
 
-            if len(c) < len(shape):
-                c = c + (slice(None),) * (len(shape) - len(c))
+        else:
+            raise IndexError("Slicing a tuple-shape mode is not allowed")
 
-            if len(c) != len(shape):
-                 raise IndexError(f"Shape mismatch: {len(shape)} vs {len(c)}")
+    elif isinstance(crd, tuple):
+        if isinstance(shape, int):
+            raise IndexError(f"Mismatch: tuple coord {crd} for shape {shape}")
 
-            new_shapes = []
-            new_strides = []
-            current_offset = 0
+        elif not isinstance(shape, tuple):
+            raise IndexError(f"{crd} is indexing a non-tuple: {shape}")
 
-            for s, d, sub_c in zip(shape, stride, c):
-                rs, rd, ro = recurse(s, d, sub_c)
-                if rs is not None:
-                    new_shapes.append(rs)
-                    new_strides.append(rd)
-                current_offset += ro
+        elif len(crd) > len(shape):
+            raise IndexError(f"Shape mismatch: {shape} and {crd}")
 
-            if len(new_shapes) == 1:
-                return new_shapes[0], new_strides[0], current_offset
-            elif len(new_shapes) == 0:
-                return 1, 0, current_offset
-            else:
-                return tuple(new_shapes), tuple(new_strides), current_offset
+        elif len(crd) < len(shape):
+            unmatch = len(shape) - len(crd)
+            crd = crd + (slice(None),) * unmatch
 
-        raise TypeError(f"Unexpected coordinate type: {type(c)}")
+        # slicing a N-dim cube
+        new_shapes, new_strides, new_offset = [], [], 0
+        for s, d, c in zip(shape, stride, crd):
+            rs, rd, ro = layout_slice(s, d, c)
+            new_shapes.append(rs)
+            new_strides.append(rd)
+            # for a non-overlapping layout, the starting position
+            # new_offset = sum_i(crd_i * stride_i)
+            new_offset += ro
 
-    if isinstance(layout.shape, tuple):
-        if not isinstance(coord, tuple):
-            coord = (coord,)
+        if len(new_shapes) == 1:
+            return new_shapes[0], new_strides[0], new_offset
+        else:
+            return tuple(new_shapes), tuple(new_strides), new_offset
 
-    s, d, off = recurse(layout.shape, layout.stride, coord)
-
-    if s is None:
-        s, d = 1, 0
-
-    return Layout(s, d), off
+    else:
+        raise IndexError(f"Unexpected coordinate type: {type(crd)}")
 
 
 class Tensor:
-    def __init__(self, ptr, layout, offset=0):
-        self.ptr = ptr
-        self.layout = layout
+    def __init__(self, layout, ptr=None, offset=0):
+        self.ptr = ptr # mocking, useless
+        self._layout = layout
         self.offset = offset
 
-    def slice(self, coord):
-        new_layout, new_offset = slice_and_offset(self.layout, coord)
-        return Tensor(self.ptr, new_layout, self.offset + new_offset)
+    def __repr__(self):
+        return f'{self.offset}@{self._layout}'
+
+    @property
+    def layout(self):
+        return self._layout.shape, self._layout.stride
+
+    def __getitem__(self, coord):
+        *new_layout, new_offset = layout_slice(*self.layout, coord)
+        return Tensor(Layout(*new_layout), self.ptr, self.offset + new_offset)
+
+    def visualize(self, **kwargs):
+        self._layout.visualize(offset=self.offset, **kwargs)
+        return self
 
 
 if __name__ == "__main__":
@@ -649,7 +641,7 @@ if __name__ == "__main__":
     #C = A.logical_divide(B) # ((4,4),(16,8)):((32,1),(128,4))
 
     A = Layout.from_string('(4,2,3):(2,1,8)') #.visualize()
-    A.logical_divide(Layout.from_string('4:2'), visualize_steps=True)
+    A.logical_divide(Layout.from_string('4:2'), visualize_steps=False)
 
     #A = Layout.from_string('((4,2,3),):((2,1,8),)').visualize()
     #A.logical_divide(Layout.from_string('4:2')).visualize()
@@ -682,43 +674,14 @@ if __name__ == "__main__":
     C = A.blocked_product(Layout.from_string('(3, 4):(1, 3)'))
     print(C); #C.visualize()
 
-    # --- slice_and_offset & Tensor tests ---
-    print("\n--- Testing slice_and_offset & Tensor ---")
-    l = Layout((10, 20))
-    # 1. Exact location
-    res, off = slice_and_offset(l, (1, 2))
-    assert off == 21
-    assert res.shape == 1
-    print("Exact location test passed")
-
-    # 2. Slice location
-    res, off = slice_and_offset(l, (slice(1, 5), slice(None)))
-    assert res.shape == (4, 20)
-    assert off == 1
-    print("Slice location test passed")
-
-    # 3. None/Ellipsis
-    res, off = slice_and_offset(l, (1, Ellipsis))
-    assert res.shape == 20
-    assert off == 1
-    print("Ellipsis test passed")
-
-    res, off = slice_and_offset(l, None)
-    assert res.shape == (10, 20)
-    print("None test passed")
-
-    # Nested
-    l_nested = Layout((10, (4, 5)))
-    res, off = slice_and_offset(l_nested, (1, 2))
-    assert off == 21
-    assert res.shape == 5
-    print("Nested layout test passed")
-
-    # Tensor integration
-    t = Tensor("ptr", l)
-    t_sliced = t.slice((1, 2))
-    print(f"Tensor sliced offset: {t_sliced.offset}")
-    assert t_sliced.offset == 21
-    print("Tensor slice test passed")
+    t = Tensor(Layout.from_string('(9,(4,8)):(59,(13,1))'))
+    t0 = Tensor(Layout.from_string('(9,):(59,)'))
+    print(t[:].visualize())
+    print(t[2])
+    print(t[1:, :])
+    print(t[1:6:2])
+    print(t[-2:, 0])
+    print(t[-2:, (2, 1)])
+    print(t0[0].visualize())
 
     plt.show()
