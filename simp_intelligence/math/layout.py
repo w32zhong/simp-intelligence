@@ -489,22 +489,18 @@ def layout_slice(shape, stride, crd):
 class Tensor:
     def __init__(self, layout, ptr=None, offset=0):
         self.ptr = ptr # mocking, useless
-        self._layout = layout
+        self.layout = layout
         self.offset = offset
 
     def __repr__(self):
-        return f'{self.offset}@{self._layout}'
-
-    @property
-    def layout(self):
-        return self._layout.shape, self._layout.stride
+        return f'{self.offset}@{self.layout}'
 
     def __getitem__(self, coord):
-        *new_layout, new_offset = layout_slice(*self.layout, coord)
+        *new_layout, new_offset = layout_slice(self.layout.shape, self.layout.stride, coord)
         return Tensor(Layout(*new_layout), self.ptr, self.offset + new_offset)
 
     def visualize(self, **kwargs):
-        self._layout.visualize(offset=self.offset, **kwargs)
+        self.layout.visualize(offset=self.offset, **kwargs)
         return self
 
 
