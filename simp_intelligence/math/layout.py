@@ -416,30 +416,15 @@ class Layout:
         return Layout.from_concate(*cat)
 
     @staticmethod
-    def _hier_unzip(func_name, mine, other, **kwargs):
-        if kwargs.get('by_mode', False):
-            kwargs['by_mode'] = False
-            assert len(mine) == len(other)
+    def _hier_unzip(layout):
+        return Layout.from_concate(
+            Layout.from_concate(*[mode[0] for mode in layout]),
+            Layout.from_concate(*[mode[1] for mode in layout])
+        )
 
-            res_tiles = []
-            res_rests = []
-            for i in range(len(other)):
-                split = Layout._hier_unzip(func_name, mine[i], other[i], **kwargs)
-                res_tiles.append(split[0])
-                res_rests.append(split[1])
+    def hierarchical_unzip(self):
+        return Layout._hier_unzip(self)
 
-            return Layout.from_concate(
-                Layout.from_concate(*res_tiles),
-                Layout.from_concate(*res_rests)
-            )
-
-        else:
-            # Atomic case: other is Layout (or scalar)
-            return getattr(Layout, func_name)(mine, other, **kwargs)
-
-    def hierarchical_unzip(self, func_name, other, **kwargs):
-        kwargs['by_mode'] = True
-        return Layout._hier_unzip(func_name, self, other, **kwargs)
 
 
 def layout_slice(shape, stride, crd):
@@ -650,7 +635,7 @@ if __name__ == "__main__":
     print(A, '⊘', B)
     C = A.logical_divide(B, by_mode=True) # ((3, 3), ((2, 4), (2, 2))):((177, 59), ((13, 2), (26, 1)))
     print(C) #C.visualize()
-    D = A.hierarchical_unzip('logical_divide', B) # ((3, (2, 4)), (3, (2, 2))):((59, (13, 1)), (177, (26, 4)))
+    D = C.hierarchical_unzip() # ((3, (2, 4)), (3, (2, 2))):((177, (13, 2)), (59, (26, 1)))
     print(D)
     quit()
 
