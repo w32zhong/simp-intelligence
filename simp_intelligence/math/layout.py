@@ -415,15 +415,11 @@ class Layout:
             cat.append(inner_layout)
         return Layout.from_concate(*cat)
 
-    @staticmethod
-    def _hier_unzip(layout):
+    def unzip(self):
         return Layout.from_concate(
-            Layout.from_concate(*[mode[0] for mode in layout]),
-            Layout.from_concate(*[mode[1] for mode in layout])
+            Layout.from_concate(*[mode[0] for mode in self]),
+            Layout.from_concate(*[mode[1] for mode in self])
         )
-
-    def hierarchical_unzip(self):
-        return Layout._hier_unzip(self)
 
 
 
@@ -631,9 +627,8 @@ if __name__ == "__main__":
     print(A, '⊘', B)
     C = A.logical_divide(B, by_mode=True) # ((3, 3), ((2, 4), (2, 2))):((177, 59), ((13, 2), (26, 1)))
     print(C) #C.visualize()
-    D = C.hierarchical_unzip() # ((3, (2, 4)), (3, (2, 2))):((177, (13, 2)), (59, (26, 1)))
+    D = C.unzip() # ((3, (2, 4)), (3, (2, 2))):((177, (13, 2)), (59, (26, 1)))
     print(D)
-    quit()
 
     #A = Layout.from_string('((2, 2),):((4, 1),)') #.visualize()
     #C = A.logical_product(Layout.from_string('6:1'))
@@ -664,5 +659,9 @@ if __name__ == "__main__":
     print(t[-2:, 0])
     print(t[-2:, (2, 1)])
     print(t0[0].visualize())
+
+    l = Layout.from_string('((2, 3), ((4, 5), (6, 8))):((2, 3), ((4, 5), (6, 8)))')
+    print(l)
+    print(l.unzip())
 
     #plt.show()
