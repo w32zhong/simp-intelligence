@@ -417,29 +417,28 @@ class Layout:
 
     @staticmethod
     def _hier_unzip(func_name, mine, other, **kwargs):
-        # this function is more alike the one in Modular.max other than that in PyCute.
+        if kwargs.get('by_mode', False):
+            kwargs['by_mode'] = False
+            assert len(mine) == len(other)
 
-        # Atomic case: if either is rank-1, don't zip, just divide.
-        if len(mine) == 1 or len(other) == 1:
-            return getattr(Layout, func_name)(mine, Layout(other.shape), **kwargs)
+            res_tiles = []
+            res_rests = []
+            for i in range(len(other)):
+                split = Layout._hier_unzip(func_name, mine[i], other[i], **kwargs)
+                res_tiles.append(split[0])
+                res_rests.append(split[1])
 
-        # Recursive case: Zip the modes together
-        res_tiles = []
-        res_rests = []
-        for i in range(len(other)):
-            split = Layout._hier_unzip(func_name, mine[i], other[i], **kwargs)
-            res_tiles.append(split[0])
-            res_rests.append(split[1])
-        # Capture remaining modes of A into the 'Rest' part
-        for i in range(len(other), len(mine)):
-            res_rests.append(mine[i])
+            return Layout.from_concate(
+                Layout.from_concate(*res_tiles),
+                Layout.from_concate(*res_rests)
+            )
 
-        return Layout.from_concate(
-            Layout.from_concate(*res_tiles),
-            Layout.from_concate(*res_rests)
-        )
+        else:
+            # Atomic case: other is Layout (or scalar)
+            return getattr(Layout, func_name)(mine, other, **kwargs)
 
     def hierarchical_unzip(self, func_name, other, **kwargs):
+        kwargs['by_mode'] = True
         return Layout._hier_unzip(func_name, self, other, **kwargs)
 
 
@@ -532,11 +531,11 @@ if __name__ == "__main__":
         b0 = cute.make_layout(3, stride=3)
         b1 = cute.make_layout((2, 4), stride=(1, 8))
         B = (b0, b1)
-        result1 = cute.logical_divide(A, B) # ((3,3),((2,4),(2,2))):((177,59),((13,2),(26,1)))
-        print(result1)
-        result2 = cute.zipped_divide(A, B) # ((3,(2,4)),(3,(2,2))):((177,(13,2)),(59,(26,1)))
-        print(result2)
-    #test(); quit()
+        cute_res1 = cute.logical_divide(A, B) # ((3,3),((2,4),(2,2))):((177,59),((13,2),(26,1)))
+        cute_res2 = cute.zipped_divide(A, B) # ((3,(2,4)),(3,(2,2))):((177,(13,2)),(59,(26,1)))
+        print(cute_res1)
+        print(cute_res2)
+    test()
 
     print(cartesian_product(
         (2, (3, 4), (5, (6, 8)))
@@ -653,6 +652,7 @@ if __name__ == "__main__":
     print(C) #C.visualize()
     D = A.hierarchical_unzip('logical_divide', B) # ((3, (2, 4)), (3, (2, 2))):((59, (13, 1)), (177, (26, 4)))
     print(D)
+    quit()
 
     #A = Layout.from_string('((2, 2),):((4, 1),)') #.visualize()
     #C = A.logical_product(Layout.from_string('6:1'))
@@ -684,4 +684,4 @@ if __name__ == "__main__":
     print(t[-2:, (2, 1)])
     print(t0[0].visualize())
 
-    plt.show()
+    #plt.show()
