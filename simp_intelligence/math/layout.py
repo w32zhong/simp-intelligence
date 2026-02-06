@@ -422,7 +422,6 @@ class Layout:
         )
 
 
-
 def layout_slice(shape, stride, crd):
     if crd is None or crd == slice(None):
         return shape, stride, 0
