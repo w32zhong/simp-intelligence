@@ -195,7 +195,7 @@ class Layout:
         return table
 
     def visualize(self, title=None, size_pad=2.0, size_scaler=0.5, offset=0,
-                  color_map=default_color_map, color_cycle=None):
+                  color_map=default_color_map, color_cycle=None, **kwargs):
         if len(self) == 3:
             figsize = (
                 size_pad + self[-1].size() * size_scaler,
@@ -204,9 +204,9 @@ class Layout:
             fig, axes = plt.subplots(self[0].size(), figsize=figsize)
             for idx in range(self[0].size()):
                 if self[0].size() == 1:
-                    self.visualize_2D_or_1D(axes, idx, offset, color_map, color_cycle)
+                    self._visualize_2D_or_1D(axes, idx, offset, color_map, color_cycle)
                 else:
-                    self.visualize_2D_or_1D(axes[idx], idx, offset, color_map, color_cycle)
+                    self._visualize_2D_or_1D(axes[idx], idx, offset, color_map, color_cycle)
 
         elif len(self) == 2:
             figsize = (
@@ -214,7 +214,7 @@ class Layout:
                 size_pad + self[0].size() * size_scaler
             )
             fig, ax = plt.subplots(figsize=figsize)
-            self.visualize_2D_or_1D(ax, None, offset, color_map, color_cycle)
+            self._visualize_2D_or_1D(ax, None, offset, color_map, color_cycle)
 
         elif len(self) == 1:
             figsize = (
@@ -222,7 +222,7 @@ class Layout:
                 size_pad + 1 * size_scaler
             )
             fig, ax = plt.subplots(figsize=figsize)
-            self.visualize_2D_or_1D(ax, None, offset, color_map, color_cycle)
+            self._visualize_2D_or_1D(ax, None, offset, color_map, color_cycle)
 
         else:
             raise NotImplementedError
@@ -231,7 +231,7 @@ class Layout:
         plt.tight_layout()
         return self
 
-    def visualize_2D_or_1D(self, ax, z, base_offset, color_map, color_cycle, debug=False):
+    def _visualize_2D_or_1D(self, ax, z, base_offset, color_map, color_cycle, debug=False):
         is_1D = (len(self) == 1)
         N = self[-1].size()
         if is_1D:
@@ -314,7 +314,7 @@ class Layout:
         new_stride = tuple(self.stride[d] for d in dims)
         return Layout(new_shape, new_stride)
 
-    def composite(self, other, *, by_mode=False, verbose=False):
+    def composite(self, other, *, by_mode=False, verbose=False, **kwargs):
         if isinstance(other.shape, tuple):
             if by_mode:
                 cat = (self[i].composite(other_i, verbose=verbose) for i, other_i in enumerate(other))
@@ -350,7 +350,7 @@ class Layout:
 
             return coalesce(Layout(tuple(result_shape), tuple(result_stride)))
 
-    def complement(self, cotarget=1, *, coalesce_result=True, verbose=False):
+    def complement(self, cotarget=1, *, coalesce_result=True, verbose=False, **kwargs):
         result_shape = []
         result_stride = []
         last_idx = 1
@@ -372,39 +372,39 @@ class Layout:
         # structures from the complement result.
         return coalesce(result) if coalesce_result else result
 
-    def logical_divide(self, other, by_mode=False, visualize_steps=False):
+    def logical_divide(self, other, by_mode=False, visualize_steps=False, **kwargs):
         if by_mode:
             cat = (
-                self[i].logical_divide(other_i, visualize_steps=visualize_steps)
+                self[i].logical_divide(other_i, visualize_steps=visualize_steps, **kwargs)
                 for i, other_i in enumerate(other)
             )
             return Layout.from_concate(*cat)
         else:
             # A ⊘ B := A o (B, ~B)
-            compl = other.complement(self.size())
-            if visualize_steps: compl.visualize(title=f'complement({other}, {self.size()})')
+            compl = other.complement(self.size(), **kwargs)
+            if visualize_steps: compl.visualize(title=f'complement({other}, {self.size()})', **kwargs)
             cat = Layout.from_concate(other, compl)
-            if visualize_steps: cat.visualize(title=f'concate({other}, {compl})')
-            res = self.composite(cat)
-            if visualize_steps: res.visualize(title=f'composite({self}, {cat})')
+            if visualize_steps: cat.visualize(title=f'concate({other}, {compl})', **kwargs)
+            res = self.composite(cat, **kwargs)
+            if visualize_steps: res.visualize(title=f'composite({self}, {cat})', **kwargs)
             return res
 
-    def logical_product(self, other, by_mode=False, visualize_steps=False):
+    def logical_product(self, other, by_mode=False, visualize_steps=False, **kwargs):
         if by_mode:
             cat = (
-                self[i].logical_product(other_i, visualize_steps=visualize_steps)
+                self[i].logical_product(other_i, visualize_steps=visualize_steps, **kwargs)
                 for i, other_i in enumerate(other)
             )
             return Layout.from_concate(*cat)
         else:
             # A ⊗ B := (A, ~A ∘ B)
             size = self.size() * other.cosize()
-            compl = self.complement(size)
-            if visualize_steps: compl.visualize(title=f'complement({self}, {size})')
-            compo = compl.composite(other)
-            if visualize_steps: compo.visualize(title=f'composite({compl}, {other})')
+            compl = self.complement(size, **kwargs)
+            if visualize_steps: compl.visualize(title=f'complement({self}, {size})', **kwargs)
+            compo = compl.composite(other, **kwargs)
+            if visualize_steps: compo.visualize(title=f'composite({compl}, {other})', **kwargs)
             res = Layout.from_concate(self, compo)
-            if visualize_steps: res.visualize(title=f'concate({self}, {compo})')
+            if visualize_steps: res.visualize(title=f'concate({self}, {compo})', **kwargs)
             return res
 
     def blocked_product(self, other, **kwargs):
