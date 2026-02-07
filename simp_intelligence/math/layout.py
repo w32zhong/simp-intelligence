@@ -336,6 +336,7 @@ class Layout:
                 new_stride = cur_stride * remain_stride # adjust stride
 
                 if verbose:
+                    print('composite', end=": ")
                     print(f'+ min({cur_shape}/{remain_stride}, {remain_shape}):{cur_stride}*{remain_stride}')
 
                 remain_shape = remain_shape // new_shape
@@ -344,7 +345,9 @@ class Layout:
                 result_shape.append(new_shape)
                 result_stride.append(new_stride)
 
-            if verbose: print(f'+ {remain_shape}:{flat(self.stride)[-1]}*{remain_stride}', end="\n\n")
+            if verbose:
+                print('composite', end=": ")
+                print(f'+ {remain_shape}:{flat(self.stride)[-1]}*{remain_stride}', end="\n\n")
             result_shape.append(remain_shape)
             result_stride.append(flat(self.stride)[-1] * remain_stride)
 
@@ -357,12 +360,16 @@ class Layout:
         reindex = sorted(zip(flat(self.stride), flat(self.shape)))
         for stride, shape in reindex:
             # complement(Layout) = (d1, d2/(s1*d1), d3/(s2*d2), ...):(1, s1*d1, s2*d2, ...)
-            if verbose: print(f'+ {stride}/{last_idx}:{last_idx}')
+            if verbose:
+                print('complement', end=": ")
+                print(f'+ {stride}/{last_idx}:{last_idx}')
             result_shape.append(stride // last_idx)
             result_stride.append(last_idx)
             last_idx = shape * stride
 
-        if verbose: print(f'+ {cotarget}/{last_idx}:{last_idx}')
+        if verbose:
+            print('complement', end=": ")
+            print(f'+ {cotarget}/{last_idx}:{last_idx}')
         result_shape.append(math.ceil(cotarget / last_idx))
         result_stride.append(last_idx)
         result = Layout(tuple(result_shape), tuple(result_stride))
