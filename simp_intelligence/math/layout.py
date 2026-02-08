@@ -358,6 +358,9 @@ class Layout:
         result_stride = []
         last_idx = 1
         reindex = sorted(zip(flat(self.stride), flat(self.shape)))
+        if verbose:
+            print('complement', end=": ")
+            print(f'sorted (stride, shape) = {reindex}')
         for stride, shape in reindex:
             # complement(Layout) = (d1, d2/(s1*d1), d3/(s2*d2), ...):(1, s1*d1, s2*d2, ...)
             if verbose:
@@ -611,6 +614,12 @@ if __name__ == "__main__":
             comp.visualize('Complement')
             full.visualize('Full')
 
+    A = Layout.from_string('(2,2):(4,1)')
+    print(A)
+    A_tilde = A.complement(24, verbose=True)
+    print(A_tilde)
+    #quit()
+
     test_complement('4:1',         coalesce=True, visualize=False)
     test_complement('6:4',         coalesce=True, visualize=False)
     test_complement('(4,6):(1,4)', coalesce=True, visualize=False)
@@ -652,7 +661,6 @@ if __name__ == "__main__":
     #C = A.blocked_product(Layout.from_string('(3, 4):(4, 5)'))
     C = A.blocked_product(Layout.from_string('(3, 4):(1, 3)'))
     print(C); #C.visualize(color_cycle=15)
-    quit()
 
     t = Tensor(Layout.from_string('(9,(4,8)):(59,(13,1))'))
     t0 = Tensor(Layout.from_string('(9,):(59,)'))
