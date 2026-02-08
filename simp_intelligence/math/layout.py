@@ -645,16 +645,14 @@ if __name__ == "__main__":
     #print(C); #C.visualize()
 
     A = Layout.from_string('(2, 5):(5, 1)') #.visualize()
-    C = A.logical_product(Layout.from_string('(3, 4):(5, 6)'), by_mode=True)
+    C = A.logical_product(Layout.from_string('(3, 4):(20, 10)'), by_mode=True)
     print(C); #C.visualize(color_cycle=15)
 
-    #A = Layout.from_string('(2, 2):(2, 1)') #.visualize()
-    #C = A.blocked_product(Layout.from_string('(2, 3):(3, 1)'))
-    #print(C); C.visualize()
-
     A = Layout.from_string('(2, 5):(5, 1)') #.visualize()
+    #C = A.blocked_product(Layout.from_string('(3, 4):(4, 5)'))
     C = A.blocked_product(Layout.from_string('(3, 4):(1, 3)'))
-    print(C); #C.visualize()
+    print(C); #C.visualize(color_cycle=15)
+    quit()
 
     t = Tensor(Layout.from_string('(9,(4,8)):(59,(13,1))'))
     t0 = Tensor(Layout.from_string('(9,):(59,)'))
