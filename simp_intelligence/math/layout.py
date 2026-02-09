@@ -2,7 +2,7 @@ import ast, math
 import matplotlib.pyplot as plt
 
 
-default_colors = plt.cm.tab20b.colors[:]
+default_colors = plt.cm.tab20c.colors[:]
 
 
 def default_color_map(index, cycle=None, colors=default_colors):
@@ -22,7 +22,7 @@ def tiled_color_map(tiles_shape, index2tile):
     def _color_map_closure(index, cycle=None):
         crd = index2tile(index)
         if crd is None:
-            return default_color_map(-1, colors=plt.cm.tab20c.colors[:]) # grey
+            return default_color_map(-1) # grey
         mapped_index = Layout(shape=tiles_shape).crd2idx(crd)
         tile_size = Layout(shape=tiles_shape[0]).size()
         return default_color_map(mapped_index // tile_size)
