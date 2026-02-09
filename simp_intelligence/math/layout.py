@@ -2,10 +2,26 @@ import ast, math
 import matplotlib.pyplot as plt
 
 
-def default_color_map(index, cycle=None):
-    colors = plt.cm.tab20b.colors[:]
+default_colors = plt.cm.tab20b.colors[:]
+
+
+def default_color_map(index, cycle=None, colors=default_colors):
     cycle = 1 if cycle is None else cycle
     return colors[(index // cycle) % len(colors)]
+
+
+def tiled_color_map(tile_layout, target_layout):
+    table = target_layout.capture_idx2crd_table()
+    def _color_map_closure(index, cycle=None):
+        if index in table:
+            target_crd = table[index]
+            dense_tile_size = Layout(shape=tile_layout.shape).size()
+            dense_target_layout = Layout(shape=target_layout.shape)
+            mapped_index = dense_target_layout.crd2idx(target_crd)
+            return default_color_map(mapped_index // dense_tile_size)
+        else:
+            return default_color_map(-1, colors=plt.cm.tab20c.colors[:]) # grey
+    return _color_map_closure
 
 
 def cartesian_product(_tuple):
@@ -199,7 +215,7 @@ class Layout:
         if len(self) == 3:
             figsize = (
                 size_pad + self[-1].size() * size_scaler,
-                size_pad + (self[-2].size() * self[-1].size()) * size_scaler
+                self[-3].size() * size_pad + (self[-3].size() * self[-2].size()) * size_scaler
             )
             fig, axes = plt.subplots(self[0].size(), figsize=figsize)
             for idx in range(self[0].size()):
@@ -664,16 +680,17 @@ if __name__ == "__main__":
 
     t = Tensor(Layout.from_string('(9,(4,8)):(59,(13,1))'))
     t0 = Tensor(Layout.from_string('(9,):(59,)'))
-    print(t[:].visualize())
+    #print(t[:].visualize())
     print(t[2])
     print(t[1:, :])
     print(t[1:6:2])
     print(t[-2:, 0])
     print(t[-2:, (2, 1)])
-    print(t0[0].visualize())
+    #print(t0[0].visualize())
 
     l = Layout.from_string('((2, 3), ((4, 5), (6, 8))):((2, 3), ((4, 5), (6, 8)))')
     print(l)
     print(l.unzip())
 
-    #plt.show()
+    Layout.from_string('(2, 3, 12):(1, 4, 6)').visualize()
+    plt.show()
