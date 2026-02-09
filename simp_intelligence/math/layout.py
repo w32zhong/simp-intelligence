@@ -10,17 +10,22 @@ def default_color_map(index, cycle=None, colors=default_colors):
     return colors[(index // cycle) % len(colors)]
 
 
-def tiled_color_map(tile_layout, target_layout):
+def default_index2tile(target_layout):
     table = target_layout.capture_idx2crd_table()
+    def mapper(index):
+        if index not in table: return None
+        return table[index]
+    return mapper
+
+
+def tiled_color_map(tiles_shape, index2tile):
     def _color_map_closure(index, cycle=None):
-        if index in table:
-            target_crd = table[index]
-            dense_tile_size = Layout(shape=tile_layout.shape).size()
-            dense_target_layout = Layout(shape=target_layout.shape)
-            mapped_index = dense_target_layout.crd2idx(target_crd)
-            return default_color_map(mapped_index // dense_tile_size)
-        else:
+        crd = index2tile(index)
+        if crd is None:
             return default_color_map(-1, colors=plt.cm.tab20c.colors[:]) # grey
+        mapped_index = Layout(shape=tiles_shape).crd2idx(crd)
+        tile_size = Layout(shape=tiles_shape[0]).size()
+        return default_color_map(mapped_index // tile_size)
     return _color_map_closure
 
 
@@ -672,11 +677,12 @@ if __name__ == "__main__":
     A = Layout.from_string('(2, 5):(5, 1)') #.visualize()
     C = A.logical_product(Layout.from_string('(3, 4):(20, 10)'), by_mode=True)
     print(C); #C.visualize(color_cycle=15)
+    C.visualize(color_map=tiled_color_map(C.shape, default_index2tile(C)))
 
     A = Layout.from_string('(2, 5):(5, 1)') #.visualize()
     #C = A.blocked_product(Layout.from_string('(3, 4):(4, 5)'))
     C = A.blocked_product(Layout.from_string('(3, 4):(1, 3)'))
-    print(C); #C.visualize(color_cycle=15)
+    print(C);
 
     t = Tensor(Layout.from_string('(9,(4,8)):(59,(13,1))'))
     t0 = Tensor(Layout.from_string('(9,):(59,)'))
@@ -692,5 +698,15 @@ if __name__ == "__main__":
     print(l)
     print(l.unzip())
 
-    Layout.from_string('(2, 3, 12):(1, 4, 6)').visualize()
+    A = Layout.from_string('(9,(4,8)):(59,(13,1))')
+    B = Layout.from_string('3,(2,4):3,(1,8)')
+    C = A.logical_divide(B, by_mode=True)
+    table = C.capture_idx2crd_table()
+    def mapper(idx):
+        if idx not in table: return None
+        ((a, b), ((c, d), (e, f))) = table[idx]
+        return ((a, (c, d)), (b, (e, f)))
+    color_map = tiled_color_map(((3, (2, 4)), (3, (2, 2))), mapper)
+    C.visualize(color_map=color_map)
+
     plt.show()
